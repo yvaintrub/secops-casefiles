@@ -1,0 +1,95 @@
+# 🛡 Demo Case: Threat Hunting Beyond IOCs (Anonymized)
+
+## 📌 Executive Summary
+This case illustrates how **threat hunting** goes beyond chasing IPs or hashes.  
+By focusing on **behavioral patterns** and ATT&CK techniques, the analyst identified **service account abuse** and lateral movement early.  
+
+**🎯 Outcome:** confirmed abnormal logon behavior, privilege misuse, and lateral movement.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++-------------------------+
+|   Windows Event Logs    |
+|   (4624 / 4625)         |
++-------------------------+
+             |
+             v
++-------------------------+
+| Suspicious Logons       |
+| (Service Account, 3 AM) |
++-------------------------+
+             |
+             v
++-------------------------+
+| MITRE ATT&CK T1078      |
+|  Valid Accounts         |
++-------------------------+
+             |
+             v
++-------------------------+
+|   Lateral Movement      |
+| (Remote PowerShell)     |
++-------------------------+
+             |
+             v
++-------------------------+
+| Credential Dumping      |
+| (LSASS via ProcDump)    |
++-------------------------+
+             |
+             v
++-------------------------+
+| Domain Controller Recon |
+| (Net Commands, LDAP)    |
++-------------------------+
+
+---
+
+## 📖 Hunt Narrative
+
+- 🔍 Focused on **service account logons** → spotted odd after-hours activity.  
+- 🟡 Found **valid account abuse** → MITRE T1078.  
+- 🔴 Correlated with PowerShell remoting + LSASS dump.  
+- 🟢 Escalated to confirm **lateral movement attempt** → DC recon commands.  
+
+---
+
+## ⏱️ Timeline (UTC)
+
+| Time   | Event                                       |
+|--------|---------------------------------------------|
+| 01:10  | 🔍 Abnormal 4624 logons (service account)    |
+| 01:25  | 🟡 Remote PowerShell sessions observed       |
+| 01:40  | 🔴 LSASS dump attempt via ProcDump           |
+| 02:00  | 🟢 Recon on Domain Controller initiated      |
+
+---
+
+## 🔑 Key Findings
+- Abnormal logons triggered hunt hypothesis.  
+- PowerShell + LSASS dump linked to credential theft.  
+- Lateral movement path confirmed before malware stage.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1078 – Valid Accounts**  
+- **T1059 – Command Line Execution (PowerShell)**  
+- **T1003 – OS Credential Dumping (LSASS)**  
+- **T1087 – Account Discovery**  
+
+---
+
+## 👀 Detection Use Cases
+- Alert on service account logons outside baseline.  
+- Detect `procdump.exe` accessing LSASS.  
+- Remote PowerShell session logging + alerts.  
+
+---
+
+## 🛡️ Recommendations
+- Restrict service account logons.  
+- Harden LSASS memory protection.  
+- Automate hunting queries into SIEM rules. 
