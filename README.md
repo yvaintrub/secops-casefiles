@@ -20,4 +20,6 @@ It demonstrates capabilities in:
 These casefiles are **completely anonymized and fictionalized**.  
 Any resemblance to actual breaches, clients, or attackers is purely coincidental.  
 
+<details><summary>Fun note</summary>
 👾 In fact, let’s be honest: I made it all up. The only APT here is **“Advanced Pretend Threats.”**
+</details>
