@@ -1,0 +1,24 @@
+Automating Dashboard Reporting
+
+Inspired by Cortex XSOAR script-based widgets examples: enabling real-time dashboards via automation scripts :contentReference[oaicite:2]{index=2}.
+
+### Flow (ASCII Diagram)
+
++----------------------+
+| Scheduled Job Trigger |
+| (e.g., daily at 00:00)|
++----------------------+
+           |
+           v
++----------------------+
+| Run Automation Script|
+| (count closed incidents) |
++----------------------+
+           |
+           v
++----------------------+
+| Update Dashboard Widget |
+| (histogram/metric)      |
++----------------------+ 
+
+---
