@@ -1,0 +1,127 @@
+# 🛡 Demo Case: Human-Operated Ransomware (Anonymized)
+
+## 📌 Executive Summary
+This case describes a **multi-stage ransomware incident**.  
+The attacker gained access via an exposed **RDP service**, escalated to domain admin, moved laterally with **Cobalt Strike**, and deployed ransomware domain-wide through **Group Policy**.  
+They also exfiltrated sensitive files before encryption.  
+
+**🎯 Outcome:** confirmed data exfiltration, ransomware deployment at scale, and delayed detection.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
+                     +-------------------+
+                     |   Attacker Host   |
+                     +-------------------+
+                               |
+                               v
+                     +-------------------+
+                     | 🔴 RDP brute-force |
+                     +-------------------+
+                               |
+                               v
+                     +-----------------------+
+                     | Initial Workstation   |
+                     +-----------------------+
+                               |
+                               v
+                 +----------------------------+
+                 | 🟡 LSASS dump (Mimikatz)   |
+                 +----------------------------+
+                               |
+                               v
+                     +-----------------------+
+                     | Domain Admin Creds    |
+                     +-----------------------+
+                               |
+                               v
+                     +-----------------------+
+                     | 🔴 Cobalt Strike      |
+                     |     beacon            |
+                     +-----------------------+
+                               |
+                               v
+                     +-----------------------+
+                     |   Domain Controller   |
+                     +-----------------------+
+                        /              \
+                       /                \
+                      v                  v
+   +---------------------------+   +----------------------+
+   | 🔴 Group Policy Push      |   | 🟢 FTP Exfiltration  |
+   +---------------------------+   +----------------------+
+              |
+              v
+   +---------------------------+
+   | 🔒 Endpoints Encrypted    |
+   +---------------------------+
+
+## 📖 Attack Narrative
+
+### Stage 1 – Initial Access & Escalation
+- 🔴 **RDP brute-force** → successful login.  
+- 🟡 **Privilege escalation** via DLL hijack + LSASS dump (Mimikatz).  
+- 🟡 Domain admin credentials harvested.  
+
+### Stage 2 – Lateral Movement & Recon
+- 🔴 **Cobalt Strike beacon** deployed for C2.  
+- 🟡 SMB shares + stolen creds used for pivot.  
+- 🟢 **PowerView** run for domain reconnaissance.  
+
+### Stage 3 – Ransomware Deployment & Exfiltration
+- 🔴 **Group Policy** modified to push ransomware.  
+- 🔴 **Sensitive files exfiltrated via FTP**.  
+- 🔴 **Encryption triggered** → ransom notes deployed.  
+
+---
+
+## ⏱️ Timeline (UTC)
+
+| Time   | Event                                      |
+|--------|--------------------------------------------|
+| T0     | 🔴 RDP brute-force success                 |
+| +1 hr  | 🟡 LSASS dump → admin creds harvested       |
+| +2 hr  | 🔴 Cobalt Strike beacon active              |
+| +4 hr  | 🔴 GPO used to deploy ransomware            |
+| +5 hr  | 🔴 Data exfiltration via FTP                |
+| +6 hr  | 🔴 Ransomware execution, ransom dropped     |
+
+---
+
+## 🔑 Key Findings
+- 🔴 Exposed RDP allowed stealthy entry.  
+- 🟡 Privilege escalation → domain admin compromise.  
+- 🔴 Ransomware distributed via Group Policy.  
+- 🔴 Data exfiltration confirmed before encryption.  
+- 🟡 Detection & response were delayed.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1210** – Exploitation of Remote Services (RDP)  
+- **T1003** – OS Credential Dumping (LSASS / Mimikatz)  
+- **T1071.001** – Application Layer Protocol (Cobalt Strike C2)  
+- **T1486** – Data Encrypted for Impact (Ransomware)  
+- **T1020** – Automated Exfiltration (FTP)  
+- **T1069** – Permission Group Discovery (PowerView)  
+
+---
+
+## 👀 Detection Use Cases
+- 🚨 Alert on unusual external RDP logins.  
+- 🟡 Detect LSASS memory access (Mimikatz-like behavior).  
+- 🔴 Monitor **Group Policy changes** outside maintenance windows.  
+- 🔴 Outbound FTP transfers to unknown hosts.  
+- 🔴 Mass file access & encryption behavior at endpoints.  
+
+---
+
+## 🛡️ Recommendations
+- Block or restrict RDP; enforce MFA.  
+- Harden LSASS against credential dumping.  
+- Audit & alert on GPO modifications.  
+- Monitor outbound traffic for exfiltration.  
+- Deploy ransomware-specific detections in SIEM/EDR.  
+
+---
