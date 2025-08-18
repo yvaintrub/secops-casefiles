@@ -123,5 +123,3 @@ They also exfiltrated sensitive files before encryption.
 - Audit & alert on GPO modifications.  
 - Monitor outbound traffic for exfiltration.  
 - Deploy ransomware-specific detections in SIEM/EDR.  
-
----
