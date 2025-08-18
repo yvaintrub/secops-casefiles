@@ -1,0 +1,32 @@
+Automated User Account Lockout (Suspicious Login)
+
+### Flow (ASCII Diagram)
+
++-------------------------+
+| SIEM Alert: Suspicious  |
+| Login (geo impossible)  |
++-------------------------+
+           |
+           v
++-------------------------+
+| Enrich w/ Geo & TI Feeds|
++-------------------------+
+           |
+           v
++-------------------------+
+| Check Recent Logins     |
+| & MFA Failures          |
++-------------------------+
+           |
+           v
++-------------------------+
+| Auto-Disable Account    |
+| (via AD/Azure AD API)   |
++-------------------------+
+           |
+           v
++-------------------------+
+| Notify SOC + User       |
++-------------------------+
+
+**Benefit:** prevents account misuse within 1–2 minutes of detection, instead of waiting for manual SOC approval.
