@@ -1,0 +1,31 @@
+Automating Evidence Replacement via API
+
+Based on Cortex XSOAR API usage in automations, enabling replacement of incident evidence programmatically :contentReference[oaicite:3]{index=3}.
+
+### Flow (ASCII Diagram)
+
++--------------------------+
+| User Tags Evidence Entry |
++--------------------------+
+            |
+            v
++--------------------------+
+| Automation Script Runs   |
+| – search evidence entry |
++--------------------------+
+            |
+            v
++--------------------------+
+| Delete old evidence       |
++--------------------------+
+            |
+            v
++--------------------------+
+| Upload new evidence file  |
++--------------------------+
+            |
+            v
++--------------------------+
+| Update Incident Evidence  |
+| (Clean War Room entries)  |
++--------------------------+
