@@ -1,0 +1,106 @@
+# 🛡 Demo Case: Cloud OAuth Abuse in Azure (Anonymized)
+
+## 📌 Executive Summary
+This case describes a **cloud identity attack** via a compromised OAuth app in Azure.  
+The attacker minted tokens, enumerated resources, and exfiltrated data from Blob storage, maintaining persistence by registering a new rogue application.  
+
+**🎯 Outcome:** cloud tenant identity compromise, fast data theft, and persistence.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++-------------------------+
+| External Attacker       |
+| (Internet)              |
++-------------------------+
+             |
+             v
++-------------------------+
+| Compromised OAuth App   |
+| (Leaked Secret)         |
++-------------------------+
+             |
+             v
++-------------------------+
+| Token Minting           |
+| (Azure AD / Graph API)  |
++-------------------------+
+             |
+             v
++-------------------------+
+| Resource Enumeration    |
+| - VM list               |
+| - Blob Storage          |
+| - KeyVault Secrets      |
++-------------------------+
+             |
+             v
++-------------------------+
+| Data Exfiltration       |
+| (Blob → External S3)    |
++-------------------------+
+             |
+             v
++-------------------------+
+| Persistence             |
+| Rogue App Registration  |
++-------------------------+
+
+---
+
+## 📖 Attack Narrative
+
+### Stage 1 – Initial Access
+- 🔴 OAuth app credentials leaked (client secret).  
+- 🟡 Attacker minted access tokens via Graph API.  
+
+### Stage 2 – Reconnaissance
+- 🔴 Enumerated Azure subscriptions, VM metadata.  
+- 🟡 Queried KeyVault for sensitive secrets.  
+
+### Stage 3 – Exfiltration & Persistence
+- 🔴 Downloaded data from Blob Storage.  
+- 🟡 Registered new rogue OAuth app → persistence in tenant.  
+
+---
+
+## ⏱️ Timeline (UTC)
+
+| Time   | Event                                       |
+|--------|---------------------------------------------|
+| 11:05  | 🔴 OAuth app secret abused → login success   |
+| 11:20  | 🟡 Tokens minted (Graph API)                 |
+| 11:35  | 🔴 Resource enumeration (VMs, Blob, KeyVault)|
+| 11:50  | 🔴 Blob dump → exfiltration                  |
+| 12:15  | 🟡 Rogue app registered for persistence      |
+
+---
+
+## 🔑 Key Findings
+- OAuth credential theft → full tenant compromise.  
+- Exfiltration within 1 hour of initial access.  
+- Persistence ensured via app registration.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1528 – Steal Application Access Token**  
+- **T1078 – Valid Accounts (Cloud Identity)**  
+- **T1530 – Data from Cloud Storage**  
+- **T1136.003 – Create Account (Cloud App Registration)**  
+
+---
+
+## 👀 Detection Use Cases
+- Alert on anomalous OAuth token minting.  
+- Detect new app registrations outside change windows.  
+- Monitor Graph API queries for Blob + KeyVault.  
+
+---
+
+## 🛡️ Recommendations
+- Rotate OAuth secrets & enforce certificate auth.  
+- Require MFA for app management.  
+- Monitor Azure AD Sign-In + Graph API logs.  
+- Implement least-privilege for service principals.  
