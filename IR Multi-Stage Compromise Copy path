@@ -1,4 +1,4 @@
-# 🛡 Demo Case Study: Multi-Stage Compromise (Anonymized)
+# 🛡 Demo Case: Multi-Stage Compromise (Anonymized)
 
 ## 📌 Executive Summary
 This case shows a **multi-stage compromise** across two Linux servers (`10.0.0.7` and `10.0.0.6`).  
