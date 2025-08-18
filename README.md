@@ -5,13 +5,6 @@ Each case includes ASCII attack flows, timelines, and MITRE ATT&CK mappings, plu
 
 ---
 
-## 📂 Repository Structure
-│  ├─ incident-response/    # Ransomware, Cloud credential abuse, etc.
-│  ├─ threat-hunting/       # AWS, Azure, GCP abuse, hunting beyond IOCs
-│  └─ automation/           # XSOAR playbooks, AI-powered summarization
-
----
-
 ## 🎯 Purpose
 Provide realistic, hands-on examples for:
 - IR analysts practicing investigations  
