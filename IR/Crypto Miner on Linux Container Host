@@ -1,0 +1,74 @@
+# 🛡 Crypto Miner on Linux Container Host
+
+## 📌 Executive Summary
+During log review, unusual CPU spikes were observed on a Kubernetes worker node. Investigation revealed a crypto miner binary (`xmrig`) deployed via a misconfigured container. The attacker exploited exposed Docker API to deploy the container.
+
+**🎯 Outcome:** resource hijacking detected, miner removed, exposure closed.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++---------------------------+
+| Exposed Docker API Port   |
++---------------------------+
+             |
+             v
++---------------------------+
+| Attacker Deployed Malic.  |
+| Container (xmrig)         |
++---------------------------+
+             |
+             v
++---------------------------+
+| High CPU Usage            |
+| & Outbound Pool Traffic   |
++---------------------------+
+             |
+             v
++---------------------------+
+| SOC Alert → Investigation |
++---------------------------+
+             |
+             v
++---------------------------+
+| Container Removed, Port   |
+| Secured                   |
++---------------------------+
+
+---
+
+## ⏱ Timeline (UTC)
+- 02:41 – Metrics show CPU usage 95% on worker node.  
+- 02:44 – Netflow reveals mining pool connections.  
+- 02:50 – Analyst confirms xmrig binary inside container.  
+- 03:05 – Container killed; port closed.  
+- 03:30 – Post-mortem + K8s audit logs reviewed.  
+
+---
+
+## 🔑 Key Findings
+- Docker API exposed to internet without auth.  
+- Miner pulled from public registry.  
+- Traffic to Monero pool detected.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1190 – Exploit Public-Facing Application**  
+- **T1496 – Resource Hijacking**  
+- **T1105 – Ingress Tool Transfer**  
+
+---
+
+## 👀 Detection Use Cases
+- Monitor abnormal CPU / GPU spikes.  
+- Alert on containers pulling suspicious images.  
+- Detect outbound to known mining pools.  
+
+---
+
+## 🛡️ Recommendations
+- Restrict Docker API access.  
+- Enable authentication for container deployments.  
+- Build detections for mining indicators in SIEM.  
