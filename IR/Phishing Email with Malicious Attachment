@@ -1,0 +1,75 @@
+# 🛡 Phishing Email with Malicious Attachment
+
+## 📌 Executive Summary
+A user reported a suspicious email with an attached Excel file. The file contained an obfuscated macro that attempted to download a remote payload. The payload was blocked by the proxy, preventing further compromise.
+
+**🎯 Outcome:** early user report + proxy block stopped attack before execution.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++---------------------------+
+| Phishing Email Delivered  |
+| (Excel w/ Macro)          |
++---------------------------+
+             |
+             v
++---------------------------+
+| User Opens File → Macro   |
+| Execution Prompt          |
++---------------------------+
+             |
+             v
++---------------------------+
+| Macro Attempts Download   |
+| Remote EXE via HTTP       |
++---------------------------+
+             |
+             v
++---------------------------+
+| Proxy Blocks Connection   |
++---------------------------+
+             |
+             v
++---------------------------+
+| Incident Closed w/ User   |
+| Awareness Training        |
++---------------------------+
+
+---
+
+## ⏱ Timeline (UTC)
+- 14:12 – User reports suspicious email to SOC.  
+- 14:20 – Email headers analyzed; phishing confirmed.  
+- 14:32 – Sandbox detonation shows macro attempt.  
+- 14:35 – Proxy logs confirm block of outbound IP.  
+- 15:00 – User re-educated; IOC shared with mail gateway.  
+
+---
+
+## 🔑 Key Findings
+- Obfuscated VBA macro attempting payload download.  
+- Payload domain flagged in TI feeds.  
+- No lateral movement observed.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1566.001 – Spearphishing Attachment**  
+- **T1204 – User Execution**  
+- **T1105 – Ingress Tool Transfer**  
+
+---
+
+## 👀 Detection Use Cases
+- Alert on Office files with macros from external senders.  
+- Detect HTTP requests to uncommon ports/domains.  
+- Cross-check attachment hashes in TI feeds.  
+
+---
+
+## 🛡️ Recommendations
+- Block Office macros by default.  
+- Train users to escalate suspicious emails.  
+- Improve mail filtering for common phishing lures.  
