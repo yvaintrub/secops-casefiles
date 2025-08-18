@@ -112,4 +112,4 @@ They then **brute-forced FTP** on Host B, pivoted via SSH, deployed a custom bac
 - Improve logging: `auditd` for `execve`, `useradd`, containers.  
 - Rate-limit & monitor FTP/SSH services.  
 - Harden segmentation between critical hosts.  
-- Add detections for **Sliver / UPSET_RHYTHM** in SIEM & EDR hunts.  
+- Add detections for **Sliver / UPSET_RHYTHM** in SIEM & EDR hunts. 
