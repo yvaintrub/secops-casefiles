@@ -1,0 +1,35 @@
+AI-Powered Incident Summarization
+
+Many SOCs waste time on writing long incident notes. Using XSOAR’s integration with LLM/AI (OpenAI, Azure OpenAI, etc.), incidents can be summarized automatically.
+
+### Flow (ASCII Diagram)
+
++--------------------------+
+| Incident Created (SIEM)  |
++--------------------------+
+            |
+            v
++--------------------------+
+| Automation Trigger       |
+| (on new incident)        |
++--------------------------+
+            |
+            v
++--------------------------+
+| Collect Evidence         |
+| (logs, alerts, emails)   |
++--------------------------+
+            |
+            v
++--------------------------+
+| AI Summarization         |
+| (OpenAI / Azure OpenAI)  |
++--------------------------+
+            |
+            v
++--------------------------+
+| Add Summary to War Room  |
+| + Notify Analyst (Slack) |
++--------------------------+
+
+**Benefit:** analysts get a quick readable summary in <30s, saving 10–15 min per ticket.
