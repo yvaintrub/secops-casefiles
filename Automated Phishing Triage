@@ -1,0 +1,31 @@
+Automated Phishing Triage
+
+### Flow (ASCII Diagram)
+
++-------------------------+
+| New Email Reported (SOC)|
++-------------------------+
+           |
+           v
++-------------------------+
+| Extract IOCs (URLs, IPs)|
++-------------------------+
+           |
+           v
++-------------------------+
+| Threat Intel Lookup     |
+| (VT, OTX, MISP, etc.)   |
++-------------------------+
+           |
+           v
++-------------------------+
+| Reputation Scoring      |
++-------------------------+
+           |
+           v
++-------------------------+
+| Auto-Tag Email +        |
+| Analyst Notification    |
++-------------------------+
+
+**Benefit:** cuts phishing triage time from ~15 min to <2 min per case, ensuring analysts only review high-risk emails.
