@@ -103,4 +103,4 @@ The attacker minted tokens, enumerated resources, and exfiltrated data from Blob
 - Rotate OAuth secrets & enforce certificate auth.  
 - Require MFA for app management.  
 - Monitor Azure AD Sign-In + Graph API logs.  
-- Implement least-privilege for service principals. 
+- Implement least-privilege for service principals.
