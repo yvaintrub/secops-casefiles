@@ -6,10 +6,13 @@ Each case includes ASCII attack flows, timelines, and MITRE ATT&CK mappings, plu
 ---
 
 ## 🎯 Purpose
-Provide realistic, hands-on examples for:
-- IR analysts practicing investigations  
-- Threat hunters refining hypotheses  
-- SOC teams building automation in XSOAR  
+
+This repository is designed to showcase **practical, hands-on SecOps expertise** through anonymized casefiles.
+
+It demonstrates capabilities in:
+- 🕵️ **Incident Response (IR):** building timelines, analyzing attacker behavior, producing executive summaries.  
+- 🔍 **Threat Hunting:** hypothesis-driven hunts in cloud and on-prem environments (AWS, Azure, GCP, beyond IOCs).  
+- ⚙️ **SOAR Automation:** Cortex XSOAR playbooks for phishing, malware, threat intel enrichment, and AI-powered workflows.  
 
 ---
 
