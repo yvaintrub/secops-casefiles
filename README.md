@@ -6,9 +6,9 @@ Each case includes ASCII attack flows, timelines, and MITRE ATT&CK mappings, plu
 ---
 
 ## 📂 Repository Structure
-├─ cases/                 # Incident Response & Threat Hunting case studies  
-├─ automation/            # Cortex XSOAR playbooks & workflows  
-├─ README.md              # Project overview  
+│  ├─ incident-response/    # Ransomware, Cloud credential abuse, etc.
+│  ├─ threat-hunting/       # AWS, Azure, GCP abuse, hunting beyond IOCs
+│  └─ automation/           # XSOAR playbooks, AI-powered summarization
 
 ---
 
