@@ -1,0 +1,37 @@
+Automated Threat Intelligence Enrichment
+
+Before escalation, incidents should be enriched with context (hash, domain, IP). XSOAR can query multiple TI sources (VirusTotal, MISP, Palo Alto Autofocus, Recorded Future).
+
+### Flow (ASCII Diagram)
+
++-------------------------+
+| IOC Detected (alert)    |
++-------------------------+
+           |
+           v
++-------------------------+
+| Automation Trigger      |
+| (IOC extraction)        |
++-------------------------+
+           |
+           v
++-------------------------+
+| Threat Intel Queries    |
+| - VirusTotal            |
+| - MISP                  |
+| - Recorded Future       |
++-------------------------+
+           |
+           v
++-------------------------+
+| Aggregate Reputation    |
+| + Confidence Scoring    |
++-------------------------+
+           |
+           v
++-------------------------+
+| Update Incident         |
+| (add TI context)        |
++-------------------------+
+
+**Benefit:** eliminates manual copy/paste lookups, ensures consistent enrichment.
