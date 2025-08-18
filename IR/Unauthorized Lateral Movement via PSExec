@@ -1,0 +1,75 @@
+# 🛡 Unauthorized Lateral Movement via PSExec
+
+## 📌 Executive Summary
+EDR detected suspicious use of PSExec from a finance workstation targeting a file server. Investigation confirmed stolen domain credentials were used to attempt lateral movement. The attempt was contained before any persistence or exfiltration occurred.
+
+**🎯 Outcome:** lateral movement blocked, credentials reset, no data loss.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++---------------------------+
+| Compromised Workstation   |
+| (Finance Dept)            |
++---------------------------+
+             |
+             v
++---------------------------+
+| Attacker Runs PSExec      |
+| w/ Stolen Domain Creds    |
++---------------------------+
+             |
+             v
++---------------------------+
+| Connection Attempt to     |
+| File Server               |
++---------------------------+
+             |
+             v
++---------------------------+
+| EDR Alert → SOC Response  |
++---------------------------+
+             |
+             v
++---------------------------+
+| Account Disabled +        |
+| Lateral Move Stopped      |
++---------------------------+
+
+---
+
+## ⏱ Timeline (UTC)
+- 18:04 – EDR logs suspicious PSExec execution.  
+- 18:08 – SOC validates command line args w/ domain admin creds.  
+- 18:15 – Workstation isolated; creds reset.  
+- 18:40 – No persistence or malware observed on server.  
+- 19:00 – IOC sweep performed, case closed.  
+
+---
+
+## 🔑 Key Findings
+- PSExec executed with stolen admin credentials.  
+- Attempted pivot to sensitive file server.  
+- Activity detected within minutes.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1021.002 – SMB/Windows Admin Shares**  
+- **T1569.002 – Remote Service Execution (PSExec)**  
+- **T1078 – Valid Accounts**  
+
+---
+
+## 👀 Detection Use Cases
+- Alert on PSExec usage from non-admin hosts.  
+- Monitor use of domain admin creds outside normal scope.  
+- Correlate SMB admin share usage with unusual accounts.  
+
+---
+
+## 🛡️ Recommendations
+- Restrict PSExec usage to IT admins only.  
+- Enforce just-in-time access for privileged accounts.  
+- Monitor authentication patterns for anomalies.  
