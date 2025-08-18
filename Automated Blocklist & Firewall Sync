@@ -1,0 +1,37 @@
+Automated Blocklist & Firewall Sync
+
+Often after TI lookup, IOCs must be blocked across multiple tools (EDR, NGFW, proxy). XSOAR automates cross-platform updates.
+
+### Flow (ASCII Diagram)
+
++--------------------------+
+| Malicious IOC Confirmed  |
++--------------------------+
+            |
+            v
++--------------------------+
+| XSOAR Playbook Trigger   |
+| (IOC = "High Risk")      |
++--------------------------+
+            |
+            v
++--------------------------+
+| Push to Firewall (PAN-OS)|
++--------------------------+
+            |
+            v
++--------------------------+
+| Push to EDR (CrowdStrike)|
++--------------------------+
+            |
+            v
++--------------------------+
+| Push to Proxy/SWG        |
++--------------------------+
+            |
+            v
++--------------------------+
+| Confirm in SIEM Logs     |
++--------------------------+
+
+**Benefit:** single IOC decision → automatic multi-tool enforcement in under 1 minute.
