@@ -1,0 +1,38 @@
+#  XSOAR Automation Case 
+
+## Case A – Automated Phishing Response Workflow
+
+From Cortex XSOAR documentation: automating phishing triage significantly reduces analyst load and speeds response :contentReference[oaicite:1]{index=1}.
+
+### Attack Flow (ASCII Diagram)
+
++------------------------+
+| Phishing Alert Ingest  |
+| (Email via SIEM/EDR)   |
++------------------------+
+            |
+            v
++------------------------+
+| Automated Enrichment   |
+| (TI, attachments, URLs)|
++------------------------+
+            |
+            v
++------------------------+
+| False Positive Check   |
+| (Sandbox, reputation)  |
++------------------------+
+            |
+            v
++------------------------+
+| Remediate Actions      |
+| (Block URL, notify user) |
++------------------------+
+            |
+            v
++------------------------+
+| Close Incident         |
+| (Ticket, Notification) |
++------------------------+
+
+---
