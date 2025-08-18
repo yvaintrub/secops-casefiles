@@ -1,0 +1,115 @@
+# 🛡 Demo Case Study: Multi-Stage Compromise (Anonymized)
+
+## 📌 Executive Summary
+This case shows a **multi-stage compromise** across two Linux servers (`10.0.0.7` and `10.0.0.6`).  
+The attacker first created unauthorized accounts and deployed **Sliver C2** on Host A.  
+They then **brute-forced FTP** on Host B, pivoted via SSH, deployed a custom backdoor (`UPSET_RHYTHM`), executed a disguised Trojan (`vsftpd.jpg`), and attempted **anti-forensics** with container tampering (`runc delete --force`).  
+
+**🎯 Outcome:** confirmed C2 activity, lateral movement, brute-force credential abuse, persistence, and cleanup attempts.  
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
+                   +-------------------+
+                   |  External Attacker|
+                   +-------------------+
+                            |
+                            v
+                   +-------------------+
+                   | Host A (10.0.0.7) |
+                   +-------------------+
+                      |         |
+       curl Sliver    |         | hydra brute-force FTP
+         +            |         v
+         |            |   +-------------------+
+         |            |   | Host B (10.0.0.6) |
+         |            |   +-------------------+
+         |            |           |
+         |            |           ├── 🟢 nohup ./UPSET_RHYTHM & (persistence)
+         |            |           ├── 🔴 exec ./vsftpd.jpg (Trojan)
+         |            |           ├── 🟡 gobuster dir … (recon)
+         |            |           └── 🟡 runc delete --force (tampering)
+         |
+   Unauthorized user (ubuntu)
+   Sliver C2 channel established
+   SSH pivot as cooluser
+
+---
+
+## 📖 Attack Narrative
+
+### Stage 1 – Foothold on Host A (10.0.0.7)
+- 🔴 `useradd ubuntu` → unauthorized user creation.  
+- 🔴 `curl -o sliver-client_linux` → download of Sliver C2.  
+- 🔴 `chmod +x sliver-client_linux` → prepared for execution.  
+- 🔴 C2 channel likely established with attacker IP.  
+
+### Stage 2 – Credential Access & Pivot
+- 🟡 `hydra -l root -P wordlist.txt ftp://10.0.0.6` → brute-force attempt.  
+- 🟡 Successful **SSH login** as `cooluser` into Host B.  
+
+### Stage 3 – Post-Exploitation on Host B (10.0.0.6)
+- 🟢 `curl -s ... -o UPSET_RHYTHM` → payload retrieval.  
+- 🟢 `nohup ./UPSET_RHYTHM &` → persistence mechanism.  
+- 🔴 Execution of **Trojan disguised as `vsftpd.jpg`** (detected by 30+ AV engines).  
+- 🟡 `gobuster dir` → reconnaissance of local services.  
+- 🟡 `runc delete --force` → container tampering (cleanup/anti-forensics).  
+
+---
+
+## ⏱️ Timeline (UTC)
+
+| Time       | Event                                                       |
+|------------|-------------------------------------------------------------|
+| 19:08      | 🔴 `useradd ubuntu` (Host A)                                |
+| 19:10–13   | 🔴 Sliver client downloaded & prepared                      |
+| 19:17      | 🟡 `runc delete --force` (Host B)                           |
+| 19:24      | 🟡 `hydra` brute-force FTP (Host A → B)                     |
+| 19:49      | 🟡 SSH login as `cooluser` (Host B)                         |
+| 19:58–20:03| 🟢 UPSET_RHYTHM persistence & Trojan execution (Host B)     |
+| 20:04      | 🟢 `gobuster` enumeration + cleanup activity                |
+
+---
+
+## 🔑 Key Findings
+- 🔴 **Foothold:** unauthorized users (`ubuntu`, `cooluser`)  
+- 🔴 **C2:** Sliver client retrieved & executed  
+- 🟡 **Credential access:** brute-force against FTP service  
+- 🟡 **Lateral movement:** SSH pivot  
+- 🟢 **Persistence:** custom payload (`UPSET_RHYTHM`, `nohup`)  
+- 🔴 **Malware:** Trojan disguised as `vsftpd.jpg`  
+- 🟡 **Recon:** `gobuster` scanning internal web  
+- 🟡 **Tampering:** container deletion (`runc delete --force`)  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1136 – Create Account** (ubuntu, cooluser)  
+- **T1059 – Command Shell** / **T1204 – User Execution** (Sliver execution)  
+- **T1110 – Brute Force** (hydra)  
+- **T1021.004 – SSH** (pivot)  
+- **T1053 – Scheduled/Background Task** (nohup persistence)  
+- **T1071 – Application Layer Protocol** (Sliver C2)  
+- **T1070 – Indicator Removal** / **T1562 – Impair Defenses** (runc delete)  
+- **T1046 – Network Service Scanning** (gobuster)  
+
+---
+
+## 👀 Detection Use Cases
+- 🚨 Alert on unexpected **`useradd`**.  
+- 🚨 Detect **curl → chmod → exec** process chains in `/tmp`.  
+- 🟡 Flag multiple FTP failures followed by success.  
+- 🟡 Watch for new accounts logging into SSH (`cooluser`).  
+- 🔴 Detect suspicious binaries (`sliver*`, `vsftpd.jpg`).  
+- 🟡 Monitor abnormal **container lifecycle** events (`runc delete --force`).  
+
+---
+
+## 🛡️ Recommendations
+- Block attacker IOCs (hashes, external IPs).  
+- Enforce MFA & key-based SSH; disable root login.  
+- Improve logging: `auditd` for `execve`, `useradd`, containers.  
+- Rate-limit & monitor FTP/SSH services.  
+- Harden segmentation between critical hosts.  
+- Add detections for **Sliver / UPSET_RHYTHM** in SIEM & EDR hunts.  
