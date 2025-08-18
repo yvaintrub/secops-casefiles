@@ -110,4 +110,4 @@ Persistence was achieved via creation of a new IAM user with admin rights.
 - Block IAM policy modifications outside change windows.  
 - Monitor S3 access patterns & enable GuardDuty.  
 - Enforce least-privilege IAM policies & MFA for console access.  
-- Automate detection of exposed keys in public repos (e.g., GitHub).  
+- Automate detection of exposed keys in public repos (e.g., GitHub). 
