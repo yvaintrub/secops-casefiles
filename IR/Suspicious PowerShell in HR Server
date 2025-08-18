@@ -1,0 +1,74 @@
+# 🛡 Suspicious PowerShell in HR Server
+
+## 📌 Executive Summary
+During routine SOC monitoring, a suspicious PowerShell command was detected on an internal HR application server. The command attempted to download a remote script from a non-whitelisted domain. No lateral movement was observed, but persistence mechanisms were deployed.
+
+**🎯 Outcome:** early detection prevented potential ransomware execution.
+
+---
+
+## 🖼 Attack Flow (ASCII Diagram)
+
++--------------------------+
+| SOC Alert: PowerShell    |
+| (Encoded Command)        |
++--------------------------+
+             |
+             v
++--------------------------+
+| Download from External   |
+| IP via Invoke-WebRequest |
++--------------------------+
+             |
+             v
++--------------------------+
+| Dropper Saved in Temp    |
+| Folder                   |
++--------------------------+
+             |
+             v
++--------------------------+
+| Persistence via Run Key  |
++--------------------------+
+             |
+             v
++--------------------------+
+| Contained & Removed      |
++--------------------------+
+
+---
+
+## ⏱ Timeline (UTC)
+- 09:11 – EDR flagged encoded PowerShell.  
+- 09:13 – Analyst confirmed outbound connection attempt.  
+- 09:20 – File quarantined; endpoint isolated.  
+- 10:05 – Registry persistence cleaned.  
+- 11:00 – Server returned to production.  
+
+---
+
+## 🔑 Key Findings
+- Suspicious PowerShell command base64-encoded.  
+- Connection to IP in ASN flagged as malicious by VirusTotal.  
+- Dropper failed to execute due to network block.  
+
+---
+
+## 🗂️ MITRE ATT&CK Mapping
+- **T1059.001 – PowerShell**  
+- **T1105 – Exfiltration Over C2 Channel**  
+- **T1547 – Boot or Logon Autostart Execution**  
+
+---
+
+## 👀 Detection Use Cases
+- Alert on PowerShell with base64-encoded args.  
+- Monitor unusual outbound Invoke-WebRequest.  
+- Detect Run Key persistence additions.  
+
+---
+
+## 🛡️ Recommendations
+- Block outbound traffic to untrusted IPs.  
+- Increase monitoring of PowerShell usage in servers.  
+- Enforce AppLocker/Defender ASR rules for script execution.  
