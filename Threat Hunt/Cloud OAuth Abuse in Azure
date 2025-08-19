@@ -1,14 +1,14 @@
-# 🛡 Demo Case: Cloud OAuth Abuse in Azure (Anonymized)
+🛡 Cloud OAuth Abuse in Azure (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-This case describes a **cloud identity attack** via a compromised OAuth app in Azure.  
-The attacker minted tokens, enumerated resources, and exfiltrated data from Blob storage, maintaining persistence by registering a new rogue application.  
+This case describes a cloud identity attack via a compromised OAuth app in Azure.
+The attacker minted tokens, enumerated resources, and exfiltrated data from Blob storage, maintaining persistence by registering a new rogue application.
 
-**🎯 Outcome:** cloud tenant identity compromise, fast data theft, and persistence.
+🎯 Outcome: cloud tenant identity compromise, rapid data theft, and persistence.
 
----
+___________________________________________________________________________________________________________________________________________________________________
 
-## 🖼 Attack Flow (ASCII Diagram)
+🖼 Attack Flow (ASCII Diagram)
 
 +-------------------------+
 | External Attacker       |
@@ -47,60 +47,151 @@ The attacker minted tokens, enumerated resources, and exfiltrated data from Blob
 | Rogue App Registration  |
 +-------------------------+
 
----
+___________________________________________________________________________________________________________________________________________________________________
 
-## 📖 Attack Narrative
+📖 Attack Narrative
+-------------------------------------------------------------------------------------------------------
+Stage 1 – Initial Access
 
-### Stage 1 – Initial Access
-- 🔴 OAuth app credentials leaked (client secret).  
-- 🟡 Attacker minted access tokens via Graph API.  
+🔴 OAuth app client secret leaked (likely GitHub / config repo).
 
-### Stage 2 – Reconnaissance
-- 🔴 Enumerated Azure subscriptions, VM metadata.  
-- 🟡 Queried KeyVault for sensitive secrets.  
+🟡 Attacker authenticated with:
 
-### Stage 3 – Exfiltration & Persistence
-- 🔴 Downloaded data from Blob Storage.  
-- 🟡 Registered new rogue OAuth app → persistence in tenant.  
+POST https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+client_id=<app-id>&client_secret=<leaked-secret>&scope=https://graph.microsoft.com/.default
 
----
+-------------------------------------------------------------------------------------------------------
+Stage 2 – Reconnaissance
 
-## ⏱️ Timeline (UTC)
+🔴 Enumerated tenant resources via Graph API:
 
-| Time   | Event                                       |
-|--------|---------------------------------------------|
-| 11:05  | 🔴 OAuth app secret abused → login success   |
-| 11:20  | 🟡 Tokens minted (Graph API)                 |
-| 11:35  | 🔴 Resource enumeration (VMs, Blob, KeyVault)|
-| 11:50  | 🔴 Blob dump → exfiltration                  |
-| 12:15  | 🟡 Rogue app registered for persistence      |
+GET https://graph.microsoft.com/v1.0/subscribedSkus
+GET https://management.azure.com/subscriptions?api-version=2020-01-01
+GET https://management.azure.com/subscriptions/<id>/resourcegroups?api-version=2021-04-01
 
----
 
-## 🔑 Key Findings
-- OAuth credential theft → full tenant compromise.  
-- Exfiltration within 1 hour of initial access.  
-- Persistence ensured via app registration.  
+🟡 Queried KeyVault secrets:
 
----
+GET https://management.azure.com/subscriptions/<id>/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/vault/secrets?api-version=7.0
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1528 – Steal Application Access Token**  
-- **T1078 – Valid Accounts (Cloud Identity)**  
-- **T1530 – Data from Cloud Storage**  
-- **T1136.003 – Create Account (Cloud App Registration)**  
+-------------------------------------------------------------------------------------------------------
+Stage 3 – Exfiltration & Persistence
 
----
+🔴 Downloaded data from Blob storage using token:
 
-## 👀 Detection Use Cases
-- Alert on anomalous OAuth token minting.  
-- Detect new app registrations outside change windows.  
-- Monitor Graph API queries for Blob + KeyVault.  
+az storage blob download-batch -d ./loot --account-name victimstorage --source sensitive-container
 
----
 
-## 🛡️ Recommendations
-- Rotate OAuth secrets & enforce certificate auth.  
-- Require MFA for app management.  
-- Monitor Azure AD Sign-In + Graph API logs.  
-- Implement least-privilege for service principals.
+🟡 Registered new rogue OAuth app via Graph API:
+
+POST https://graph.microsoft.com/v1.0/applications
+{ "displayName": "AzureUpdateSvc", "passwordCredentials": [...] }
+
+___________________________________________________________________________________________________________________________________________________________________
+
+⏱️ Timeline (UTC)
+
+| Time  | Event                                         |
+| ----- | --------------------------------------------- |
+| 11:05 | 🔴 OAuth app secret abused → token request    |
+| 11:20 | 🟡 Tokens minted (Graph API)                  |
+| 11:35 | 🔴 Resource enumeration (VMs, Blob, KeyVault) |
+| 11:50 | 🔴 Blob dump → exfiltration                   |
+| 12:15 | 🟡 Rogue OAuth app registered for persistence |
+
+___________________________________________________________________________________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Azure Logs)
+
+Azure AD Sign-In Log
+
+{
+  "time": "2025-07-21T11:05:12Z",
+  "appId": "00000000-aaaa-bbbb-cccc-111111111111",
+  "servicePrincipalName": "legacy-oauth-app",
+  "ipAddress": "185.220.101.12",
+  "status": "Success"
+}
+
+
+Azure Activity Log – Blob Exfiltration
+
+{
+  "time": "2025-07-21T11:50:45Z",
+  "operationName": "ListBlobs",
+  "caller": "legacy-oauth-app",
+  "resource": "victimstorage.blob.core.windows.net/sensitive-container",
+  "bytesTransferred": "2.1GB",
+  "clientIP": "185.220.101.12"
+}
+
+
+Azure AD Audit Log – Rogue App
+
+{
+  "time": "2025-07-21T12:15:07Z",
+  "activity": "Add application",
+  "initiatedBy": "legacy-oauth-app",
+  "targetResource": "AzureUpdateSvc",
+  "result": "success"
+}
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+| Type       | Value                                  | Status         |
+| ---------- | -------------------------------------- | -------------- |
+| IP Address | `185.220.101.12`                       | Attacker infra |
+| App ID     | `00000000-aaaa-bbbb-cccc-111111111111` | Compromised    |
+| App Name   | `legacy-oauth-app`                     | Abused         |
+| App Name   | `AzureUpdateSvc`                       | Rogue created  |
+| Resource   | `victimstorage.blob.core.windows.net`  | Exfiltrated    |
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🔑 Key Findings
+
+OAuth credential theft → direct tenant compromise.
+
+Sensitive data stolen within ~45 minutes.
+
+Persistence via rogue app registration.
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+T1528 – Steal Application Access Token
+
+T1078 – Valid Accounts (Cloud Identity)
+
+T1530 – Data from Cloud Storage
+
+T1098.003 – Account Manipulation: Cloud App
+
+___________________________________________________________________________________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+🚨 Alert on anomalous token minting from unusual IPs.
+
+🟡 Detect app registrations outside approved change window.
+
+🟡 Monitor Graph API calls to KeyVault / Blob Storage.
+
+🟡 Alert on large data transfers from Blob.
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🛡️ Recommendations
+
+Rotate/revoke leaked OAuth app secrets immediately.
+
+Prefer certificate-based auth over static client secrets.
+
+Enforce MFA + Conditional Access for app management.
+
+Monitor Azure AD Sign-In / Audit Logs for anomalous app behavior.
+
+Restrict service principals with least privilege.
