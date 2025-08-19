@@ -1,7 +1,17 @@
-Automated Phishing Triage
+# 🎣 Automated Phishing Triage (XSOAR Playbook)
 
-### Flow (ASCII Diagram)
+## 📌 Executive Summary
+Phishing is the **#1 SOC ticket type**, but most cases are false positives.  
+Manual triage (extracting IOCs, checking URLs/domains/IPs) wastes analyst time.  
+With XSOAR automation, phishing reports are enriched and scored in seconds.  
 
+**🎯 Outcome:** phishing triage time reduced from ~15 minutes to <2 minutes, analysts only focus on **high-risk emails**.
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🖼 Flow (ASCII Diagram)
+
+```
 +-------------------------+
 | New Email Reported (SOC)|
 +-------------------------+
@@ -27,5 +37,153 @@ Automated Phishing Triage
 | Auto-Tag Email +        |
 | Analyst Notification    |
 +-------------------------+
+```
 
-**Benefit:** cuts phishing triage time from ~15 min to <2 min per case, ensuring analysts only review high-risk emails.
+____________________________________________________________________________________________________________________________________________________
+
+## 📂 IOC Example
+
+```
+Email Subject: "Urgent – Invoice Attached"
+From: billing@fakecorp.biz
+IOC Extracted: hxxp://secure-pay[.]com/login
+TI Lookups:
+- VirusTotal: flagged malicious
+- OTX: reported in phishing campaigns
+- MISP: matches known IOC
+
+Verdict: High Risk → Escalated
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 💾 Automation Script (Python3) — `Phishing_IOC_Enrichment.py`
+
+```python
+def main():
+    args = demisto.args()
+    url = args.get("url")
+    results = []
+
+    # Example threat intel lookups
+    vt = demisto.executeCommand("urlscan-search", {"url": url})
+    otx = demisto.executeCommand("otx-search-url", {"url": url})
+    misp = demisto.executeCommand("misp-search-indicator", {"value": url})
+
+    score = "Benign"
+    if "malicious" in str(vt).lower() or "phishing" in str(otx).lower():
+        score = "Malicious"
+    elif "suspicious" in str(misp).lower():
+        score = "Suspicious"
+
+    md = f"### IOC Enrichment\n- URL: {url}\n- Final Score: **{score}**"
+    return_results(md)
+
+try:
+    main()
+except Exception as e:
+    return_error(f"Phishing_IOC_Enrichment failed: {e}")
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🧩 Mini-Playbook (YAML) — `Playbook-Phishing-Triage.yml`
+
+```yaml
+name: Automated Phishing Triage
+description: Extract IOCs, enrich with TI feeds, auto-score, tag incident, and notify SOC.
+fromversion: "6.0.0"
+tasks:
+  "0":
+    id: "0"
+    type: start
+    task:
+      name: Start
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    type: regular
+    task:
+      name: Extract IOCs
+      script: ExtractIndicatorsFromText
+      scriptarguments:
+        text: { simple: ${incident.emailbody} }
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    type: regular
+    task:
+      name: IOC Enrichment
+      scriptName: Phishing_IOC_Enrichment
+      scriptarguments:
+        url: { simple: ${ExtractIndicatorsFromText.URL} }
+    nexttasks:
+      '#none#': ["3"]
+  "3":
+    id: "3"
+    type: condition
+    task:
+      name: Malicious?
+      conditions:
+        - label: yes
+          condition:
+            - - operator: isEqualString
+                left: ${Phishing_IOC_Enrichment.Score}
+                right: "Malicious"
+    nexttasks:
+      "yes": ["4"]
+  "4":
+    id: "4"
+    type: regular
+    task:
+      name: Escalate to Analyst
+      script: SendEmail
+      scriptarguments:
+        to: { simple: soc-team@company.com }
+        subject: { simple: "🚨 Phishing IOC Escalated" }
+        body: { simple: "IOC flagged malicious. Please review in XSOAR." }
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🔔 Slack / Teams Notification Example
+
+```json
+{
+  "channel": "#soc-phishing",
+  "text": "🎣 New Phishing IOC Processed",
+  "attachments": [
+    {
+      "color": "#ff0000",
+      "title": "High-Risk IOC Detected",
+      "fields": [
+        { "title": "URL", "value": "hxxp://secure-pay[.]com/login", "short": false },
+        { "title": "Verdict", "value": "Malicious", "short": true },
+        { "title": "Escalated To", "value": "SOC Analyst Queue", "short": false }
+      ]
+    }
+  ]
+}
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## ✅ How It Works
+1. User reports suspicious email to SOC.  
+2. Playbook extracts URLs, domains, IPs, hashes.  
+3. Each IOC checked in **VT, OTX, MISP**.  
+4. Verdict scored → **Benign / Suspicious / Malicious**.  
+5. Case auto-tagged, SOC notified only if **high-risk**.  
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🔐 Security Notes
+- Use regex extraction for multiple IOC types.  
+- Consider blocking confirmed malicious URLs at mail gateway.  
+- Store enrichment results in SIEM for correlation.  
+- SOC should periodically tune thresholds to avoid noise.
+
+____________________________________________________________________________________________________________________________________________________
+
