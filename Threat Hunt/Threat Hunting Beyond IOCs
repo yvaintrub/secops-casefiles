@@ -1,14 +1,14 @@
-# 🛡 Demo Case: Threat Hunting Beyond IOCs (Anonymized)
+🛡 Threat Hunting Beyond IOCs (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-This case illustrates how **threat hunting** goes beyond chasing IPs or hashes.  
-By focusing on **behavioral patterns** and ATT&CK techniques, the analyst identified **service account abuse** and lateral movement early.  
+This case illustrates how threat hunting goes beyond chasing IPs or hashes.
+By focusing on behavioral patterns and MITRE ATT&CK techniques, the analyst identified service account abuse and early lateral movement attempts.
 
-**🎯 Outcome:** confirmed abnormal logon behavior, privilege misuse, and lateral movement.
+🎯 Outcome: confirmed abnormal logon behavior, privilege misuse, and domain reconnaissance.
 
----
+_________________________________________________________________________________________________________________________________________________________________________________________
 
-## 🖼 Attack Flow (ASCII Diagram)
+🖼 Attack Flow (ASCII Diagram)
 
 +-------------------------+
 |   Windows Event Logs    |
@@ -45,51 +45,157 @@ By focusing on **behavioral patterns** and ATT&CK techniques, the analyst identi
 | (Net Commands, LDAP)    |
 +-------------------------+
 
----
+_________________________________________________________________________________________________________________________________________________________________________________________
 
-## 📖 Hunt Narrative
+📖 Hunt Narrative
 
-- 🔍 Focused on **service account logons** → spotted odd after-hours activity.  
-- 🟡 Found **valid account abuse** → MITRE T1078.  
-- 🔴 Correlated with PowerShell remoting + LSASS dump.  
-- 🟢 Escalated to confirm **lateral movement attempt** → DC recon commands.  
 
----
+🔍 Hypothesis: adversaries often misuse service accounts because they are rarely monitored.
 
-## ⏱️ Timeline (UTC)
+Analyst queried SIEM for Event ID 4624 (logons) using service accounts outside of baseline hours.
 
-| Time   | Event                                       |
-|--------|---------------------------------------------|
-| 01:10  | 🔍 Abnormal 4624 logons (service account)    |
-| 01:25  | 🟡 Remote PowerShell sessions observed       |
-| 01:40  | 🔴 LSASS dump attempt via ProcDump           |
-| 02:00  | 🟢 Recon on Domain Controller initiated      |
+🟡 Found multiple successful logons around 03:00 from unusual hosts.
 
----
+🔴 Correlated with Remote PowerShell (Event ID 4104) sessions launched from finance server → engineering host.
 
-## 🔑 Key Findings
-- Abnormal logons triggered hunt hypothesis.  
-- PowerShell + LSASS dump linked to credential theft.  
-- Lateral movement path confirmed before malware stage.  
+🟡 Identified ProcDump execution targeting lsass.exe.
 
----
+🟢 On the DC, saw net group "Domain Admins" /domain and LDAP enumeration activity.
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1078 – Valid Accounts**  
-- **T1059 – Command Line Execution (PowerShell)**  
-- **T1003 – OS Credential Dumping (LSASS)**  
-- **T1087 – Account Discovery**  
+Hunt confirmed attacker moving from valid account abuse → credential dumping → DC recon.
 
----
+_________________________________________________________________________________________________________________________________________________________________________________________
 
-## 👀 Detection Use Cases
-- Alert on service account logons outside baseline.  
-- Detect `procdump.exe` accessing LSASS.  
-- Remote PowerShell session logging + alerts.  
+⏱ Timeline (UTC)
 
----
+| Time  | Event                                                   |
+| ----- | ------------------------------------------------------- |
+| 01:10 | 🔍 Abnormal 4624 logons with service account (FIN-SRV1) |
+| 01:25 | 🟡 Remote PowerShell session from FIN-SRV1 → ENG-SRV3   |
+| 01:40 | 🔴 `procdump.exe -ma lsass.exe lsass.dmp` attempt       |
+| 02:00 | 🟢 Recon on Domain Controller (`net group`, LDAP)       |
 
-## 🛡️ Recommendations
-- Restrict service account logons.  
-- Harden LSASS memory protection.  
-- Automate hunting queries into SIEM rules. 
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+Windows Security Log (4624):
+
+{
+  "time": "2025-07-21T01:10:15Z",
+  "eventID": 4624,
+  "logonType": 3,
+  "account": "svc_finance",
+  "srcHost": "FIN-SRV1",
+  "targetHost": "ENG-SRV3",
+  "status": "success"
+}
+
+PowerShell Operational Log (4104):
+
+{
+  "time": "2025-07-21T01:25:41Z",
+  "eventID": 4104,
+  "user": "DOMAIN\\svc_finance",
+  "scriptBlock": "Invoke-Command -ComputerName ENG-SRV3 -ScriptBlock {whoami}"
+}
+
+Sysmon Event (ProcDump):
+
+{
+  "time": "2025-07-21T01:40:02Z",
+  "eventID": 1,
+  "process": "procdump.exe",
+  "commandLine": "procdump.exe -ma lsass.exe C:\\Temp\\lsass.dmp",
+  "user": "DOMAIN\\svc_finance"
+}
+
+Recon Command (Domain Controller, Event ID 4688):
+
+{
+  "time": "2025-07-21T02:00:27Z",
+  "newProcessName": "cmd.exe",
+  "commandLine": "net group \"Domain Admins\" /domain",
+  "user": "DOMAIN\\svc_finance"
+}
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+💻 Attacker Commands (Reconstructed)
+
+# Lateral move via PowerShell Remoting
+Invoke-Command -ComputerName ENG-SRV3 -ScriptBlock {whoami}
+
+# Credential dumping with ProcDump
+procdump.exe -ma lsass.exe C:\Temp\lsass.dmp
+
+# Recon on Domain Controller
+net group "Domain Admins" /domain
+ldapsearch -x -h DC01 -b "dc=example,dc=org"
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+| Type    | Value               | Source       | Status         |
+| ------- | ------------------- | ------------ | -------------- |
+| Account | DOMAIN\svc\_finance | Event Logs   | Abused         |
+| Host    | FIN-SRV1            | WinLogs/SIEM | Initial pivot  |
+| Host    | ENG-SRV3            | WinLogs/SIEM | Targeted       |
+| Tool    | procdump.exe        | Sysmon       | Abused         |
+| File    | lsass.dmp           | Temp folder  | Attempted dump |
+
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+🔑 Key Findings
+
+
+🚨 Service account used outside normal hours.
+
+🚨 Remote PowerShell → lateral movement confirmed.
+
+🚨 Credential dumping attempt via ProcDump.
+
+🚨 Recon commands executed against DC.
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+
+T1078 – Valid Accounts
+
+T1059 – PowerShell
+
+T1003 – OS Credential Dumping (LSASS)
+
+T1087 – Account Discovery (Domain Recon)
+
+T1021.006 – Remote Services: PowerShell Remoting
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+
+Alert on service account logons outside baseline.
+
+Detect ProcDump accessing lsass.exe.
+
+Monitor Remote PowerShell execution across hosts.
+
+Flag domain recon commands (net group, LDAP queries).
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+🛡️ Recommendations
+
+
+Restrict service account logon permissions & apply tiering.
+
+Enable LSASS protection (RunAsPPL).
+
+Deploy constrained PowerShell + logging (ScriptBlock, Transcription).
+
+Automate hunting queries into SIEM → permanent detections.
