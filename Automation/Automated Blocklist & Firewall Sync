@@ -1,9 +1,16 @@
-Automated Blocklist & Firewall Sync
+# 🔒 Automated Blocklist & Firewall Sync (XSOAR Playbook)
 
-Often after TI lookup, IOCs must be blocked across multiple tools (EDR, NGFW, proxy). XSOAR automates cross-platform updates.
+## 📌 Executive Summary
+After threat intel lookup, confirmed malicious IOCs (IPs, hashes, domains) must be blocked quickly across **multiple enforcement points**.  
+With **Cortex XSOAR automation**, a single IOC decision triggers updates to NGFW, EDR, and proxy/SWG simultaneously.
 
-### Flow (ASCII Diagram)
+**🎯 Outcome:** one IOC verdict → multi-tool enforcement in <1 minute.
 
+____________________________________________________________________________________________________________________________________________________
+
+## 🖼 Flow (ASCII Diagram)
+
+```
 +--------------------------+
 | Malicious IOC Confirmed  |
 +--------------------------+
@@ -33,5 +40,170 @@ Often after TI lookup, IOCs must be blocked across multiple tools (EDR, NGFW, pr
 +--------------------------+
 | Confirm in SIEM Logs     |
 +--------------------------+
+```
+____________________________________________________________________________________________________________________________________________________
 
-**Benefit:** single IOC decision → automatic multi-tool enforcement in under 1 minute.
+## 📂 IOC Example (artifact passed into playbook)
+
+```
+IOC Type: IP Address
+Value: 203.0.113.45
+Verdict: Malicious (TI feed + sandbox)
+TTL: 24h
+Enforcement Targets: PAN-OS, CrowdStrike, Zscaler SWG
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 💾 Automation Script (XSOAR Python) — `Push_IOC_MultiPlatform.py`
+
+```python
+# type: automation (Python3) for Cortex XSOAR
+# args: ioc_value (required), ioc_type (ip|domain|hash), ttl (optional)
+
+from datetime import datetime
+
+def main():
+    args = demisto.args()
+    ioc = args.get("ioc_value")
+    ioc_type = args.get("ioc_type","ip").lower()
+    ttl = args.get("ttl") or "24h"
+
+    if not ioc:
+        return_error("Missing ioc_value")
+
+    # Example calls to integrations (pseudo)
+    pan_cmd = {
+        "ip": "pan-os-create-address-object",
+        "domain": "pan-os-create-fqdn-object",
+        "hash": "pan-os-custom-block"
+    }.get(ioc_type)
+
+    crowd_cmd = {
+        "ip": "cs-falcon-add-host-group",
+        "domain": "cs-falcon-custom-ioc-add",
+        "hash": "cs-falcon-custom-ioc-add"
+    }.get(ioc_type)
+
+    proxy_cmd = {
+        "ip": "zscaler-block-ip",
+        "domain": "zscaler-block-domain",
+        "hash": "zscaler-block-hash"
+    }.get(ioc_type)
+
+    results = []
+    if pan_cmd:
+        results.append(demisto.executeCommand(pan_cmd, {"value": ioc, "ttl": ttl}))
+    if crowd_cmd:
+        results.append(demisto.executeCommand(crowd_cmd, {"value": ioc, "ttl": ttl}))
+    if proxy_cmd:
+        results.append(demisto.executeCommand(proxy_cmd, {"value": ioc, "ttl": ttl}))
+
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%SZ")
+    md = f"### 🔒 IOC Enforcement ({ts} UTC)\n\nBlocked `{ioc}` ({ioc_type}) in PAN-OS, CrowdStrike, Proxy.\nTTL: {ttl}"
+    return_results(md)
+
+try:
+    main()
+except Exception as e:
+    return_error(f"Push_IOC_MultiPlatform failed: {e}")
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🧩 Mini-Playbook (YAML) — `Playbook-Automated-IOC-Enforcement.yml`
+
+```yaml
+name: Automated IOC Enforcement - MultiTool
+fromversion: "6.0.0"
+description: Push confirmed IOC to Firewall, EDR, Proxy, then validate in SIEM.
+inputs: []
+outputs: []
+tasks:
+  "0":
+    id: "0"
+    taskid: start-0000
+    type: start
+    task:
+      id: "0"
+      name: Start
+      iscommand: false
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    taskid: t1
+    type: regular
+    task:
+      id: "1"
+      name: Push IOC (MultiPlatform)
+      scriptName: Push_IOC_MultiPlatform
+    scriptarguments:
+      ioc_value: { simple: ${incident.ioc_value} }
+      ioc_type: { simple: ${incident.ioc_type} }
+      ttl: { simple: "24h" }
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    taskid: t2
+    type: regular
+    task:
+      id: "2"
+      name: Confirm in SIEM
+      brand: SplunkPy
+      iscommand: true
+      script: SplunkPy|||splunk-search
+    scriptarguments:
+      query: { simple: "index=firewall OR index=proxy message=${incident.ioc_value}" }
+    nexttasks: {}
+view:
+  paper:
+    dimensions: { height: 1200, width: 800 }
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🔔 Slack Notification Example
+
+```json
+{
+  "channel": "#soc-alerts",
+  "text": "🚨 *IOC Blocked Across Platforms* 🚨",
+  "attachments": [
+    {
+      "color": "#ff0000",
+      "title": "IOC Enforcement Successful",
+      "fields": [
+        { "title": "IOC Value", "value": "203.0.113.45", "short": true },
+        { "title": "Type", "value": "IP Address", "short": true },
+        { "title": "Platforms Updated", "value": "PAN-OS, CrowdStrike, Zscaler", "short": false },
+        { "title": "TTL", "value": "24h", "short": true },
+        { "title": "Triggered By", "value": "XSOAR Playbook", "short": true }
+      ],
+      "footer": "Cortex XSOAR",
+      "ts": 1724000000
+    }
+  ]
+}
+____________________________________________________________________________________________________________________________________________________
+
+✅ SOC team gets a real-time Slack ping with IOC details, scope of enforcement, and TTL.
+
+---
+
+## ✅ How to Use
+1. Analyst confirms IOC as **malicious / high risk**.  
+2. Playbook auto-triggers → IOC is pushed to **PAN-OS**, **CrowdStrike**, and **Proxy/SWG**.  
+3. A validation search in **SIEM** confirms blocklist hit.  
+4. Slack/SOC channel notified of enforcement.  
+
+---
+
+## 🔐 Security Notes
+- Always enforce IOC TTLs (avoid permanent false positives).  
+- Require **SOC approval** for “High Risk” before pushing.  
+- Use **rollback tasks** to auto-remove IOC if later deemed benign.  
+- Log all enforcement activity for audit.
+
+---
