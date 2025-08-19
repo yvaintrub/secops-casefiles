@@ -1,8 +1,14 @@
-AI-Powered Incident Summarization
+# 🤖 AI-Powered Incident Summarization (XSOAR + LLM Integration)
 
-Many SOCs waste time on writing long incident notes. Using XSOAR’s integration with LLM/AI (OpenAI, Azure OpenAI, etc.), incidents can be summarized automatically.
+## 📌 Executive Summary
+Many SOCs waste time writing long incident notes. With **Cortex XSOAR** automation and an **LLM provider** (OpenAI / Azure OpenAI), incidents can be summarized automatically into a clear, standardized narrative.
 
-### Flow (ASCII Diagram)
+**🎯 Outcome:** analysts get a readable summary in <30s, saving 10–15 minutes per ticket and improving MTTR.
+
+---
+_____________________________________________________________________________________________________________________________________________
+
+## 🖼 Flow (ASCII Diagram)
 
 +--------------------------+
 | Incident Created (SIEM)  |
@@ -32,4 +38,254 @@ Many SOCs waste time on writing long incident notes. Using XSOAR’s integration
 | + Notify Analyst (Slack) |
 +--------------------------+
 
-**Benefit:** analysts get a quick readable summary in <30s, saving 10–15 min per ticket.
+_____________________________________________________________________________________________________________________________________________
+
+## 📂 Artifacts (example evidence blob passed to LLM)
+
+```
+Incident: Phishing alert 3241 | Type: Phishing | Severity: High
+Reporter: alice | ID: 3241
+Alerts: src_ip=203.0.113.45; user=bob@corp.local; attachment=Invoice_Q3.xlsm;
+Timeline: 2025-07-21T14:12Z alert -> 14:20Z header analyzed -> 14:35Z proxy block
+Notables: URLDownloadToFileA observed in macro; proxy BLOCK to 185.199.111.25
+```
+
+---
+
+_____________________________________________________________________________________________________________________________________________
+
+## 💾 Automation Script (XSOAR Python) — `Summarize_Incident_LLM.py`
+
+```python
+# type: automation (Python3) for Cortex XSOAR/Demisto
+# args:
+#   evidence (required, string) – raw text to summarize
+#   provider (optional: openai|azure; default=openai)
+#   openai_api_key (optional, credential)
+#   azure_endpoint (optional) – https://<your>.openai.azure.com
+#   azure_deployment (optional) – e.g., gpt-4o-mini
+#   azure_api_key (optional, credential)
+
+import os, traceback, requests
+from datetime import datetime
+try:
+    from CommonServerPython import *  # demisto, return_results, return_error
+except Exception:
+    def return_results(x): print(x)
+    def return_error(x): raise SystemExit(x)
+
+SYS_PROMPT = """You are a SOC incident note-taker.
+Write a crisp summary for the War Room with these sections:
+- 📌 Executive Summary (1-2 sentences)
+- ⏱ Timeline (UTC, compact)
+- 👤 Affected entities (users, hosts, IPs), if present
+- 🔑 Key signals (what mattered)
+- ✅ Next actions (3-5 bullets, imperative)
+Keep it <= 2200 chars. Be factual. If data is missing, say 'N/A'.
+"""
+
+def openai_chat(api_key: str, evidence: str, model="gpt-4o-mini"):
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": SYS_PROMPT},
+            {"role": "user", "content": evidence}
+        ]
+    }
+    r = requests.post(url, headers=headers, json=payload, timeout=45)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
+
+def azure_openai_chat(endpoint: str, deployment: str, api_key: str, evidence: str):
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version=2024-02-15-preview"
+    headers = {"api-key": api_key, "Content-Type": "application/json"}
+    payload = {
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": SYS_PROMPT},
+            {"role": "user", "content": evidence}
+        ]
+    }
+    r = requests.post(url, headers=headers, json=payload, timeout=45)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
+
+def main():
+    try:
+        args = demisto.args() if 'demisto' in globals() else {}
+        evidence = (args.get("evidence") or "").strip()
+        if not evidence:
+            return_error("Missing required arg: evidence")
+
+        provider = (args.get("provider") or "openai").lower()
+        if provider == "azure":
+            endpoint = (args.get("azure_endpoint") or "").rstrip("/")
+            deployment = args.get("azure_deployment") or ""
+            api_key = args.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY") or ""
+            if not (endpoint and deployment and api_key):
+                return_error("Azure selected but azure_endpoint/azure_deployment/azure_api_key missing.")
+            summary = azure_openai_chat(endpoint, deployment, api_key, evidence)
+        else:
+            api_key = args.get("openai_api_key") or os.getenv("OPENAI_API_KEY") or ""
+            if not api_key:
+                return_error("OpenAI selected but openai_api_key is missing.")
+            summary = openai_chat(api_key, evidence)
+
+        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%SZ")
+        md = f"### 🤖 AI Summary ({ts} UTC)\n\n{summary}"
+        return_results(md)
+
+    except Exception as e:
+        return_error(f"Summarize_Incident_LLM failed: {e}\n{traceback.format_exc()}")
+
+if __name__ in ("__main__", "builtin", "builtins"):
+    main()
+```
+
+---
+
+_____________________________________________________________________________________________________________________________________________
+
+## 🧩 Mini-Playbook (YAML) — `Playbook-AI-Incident-Summarization.yml`
+
+```yaml
+name: AI - Incident Summarization (LLM)
+fromversion: "6.0.0"
+description: >
+  Collect evidence, summarize via LLM, post to War Room, notify Slack.
+inputs:
+  - key: openai_api_key
+    required: false
+    description: API key for OpenAI if provider=openai
+outputs: []
+tasks:
+  "0":
+    id: "0"
+    taskid: 00000000-0000-0000-0000-000000000000
+    type: start
+    task:
+      id: "0"
+      name: ""
+      version: -1
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    taskid: 11111111-1111-1111-1111-111111111111
+    type: regular
+    task:
+      id: "1"
+      name: Collect Evidence (Set)
+      version: -1
+      scriptName: Set
+      description: Build compact evidence blob for LLM.
+      type: regular
+    scriptarguments:
+      key:
+        simple: ai.evidence
+      value:
+        simple: >-
+          Incident: {{incident.name}} | Type: {{incident.type}} | Severity: {{incident.severity}}
+          Reporter: {{incident.owner}} | ID: {{incident.id}}
+          Alerts: {{#incident.labels}}{{label}}={{value}}; {{/incident.labels}}
+          Timeline: {{incident.created}}
+          Notables: {{incident.details}}
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    taskid: 22222222-2222-2222-2222-222222222222
+    type: regular
+    task:
+      id: "2"
+      name: Summarize with LLM
+      version: -1
+      scriptName: Summarize_Incident_LLM
+      type: regular
+    scriptarguments:
+      evidence:
+        simple: ${ai.evidence}
+      provider:
+        simple: openai
+      openai_api_key:
+        simple: ${inputs.openai_api_key}
+    nexttasks:
+      '#none#': ["3"]
+  "3":
+    id: "3"
+    taskid: 33333333-3333-3333-3333-333333333333
+    type: regular
+    task:
+      id: "3"
+      name: Notify Slack (War Room link)
+      version: -1
+      brand: SlackV3
+      iscommand: true
+      script: SlackV3|||send-notification
+    scriptarguments:
+      channel: { simple: "#soc-alerts" }
+      message:
+        simple: "🤖 AI summary posted for incident ${incident.id} — ${incident.name}"
+    nexttasks: {}
+view:
+  paper:
+    dimensions: { height: 2000, width: 1200 }
+```
+
+---
+
+_____________________________________________________________________________________________________________________________________________
+
+## 🧪 Quick Tests (cURL)
+
+**OpenAI**
+```bash
+curl https://api.openai.com/v1/chat/completions \
+ -H "Authorization: Bearer $OPENAI_API_KEY" \
+ -H "Content-Type: application/json" \
+ -d '{
+   "model": "gpt-4o-mini",
+   "temperature": 0.2,
+   "messages": [
+     {"role":"system","content":"You summarize SOC incidents in <2200 chars."},
+     {"role":"user","content":"'"$(cat evidence.txt)"'"}
+   ]
+ }'
+```
+
+**Azure OpenAI**
+```bash
+curl "$AZURE_OPENAI_ENDPOINT/openai/deployments/$AZURE_DEPLOYMENT/chat/completions?api-version=2024-02-15-preview" \
+ -H "api-key: $AZURE_OPENAI_API_KEY" \
+ -H "Content-Type: application/json" \
+ -d '{
+   "temperature": 0.2,
+   "messages": [
+     {"role":"system","content":"You summarize SOC incidents in <2200 chars."},
+     {"role":"user","content":"'"$(cat evidence.txt)"'"}
+   ]
+ }'
+```
+
+---
+_____________________________________________________________________________________________________________________________________________
+
+## ✅ How to Use
+1. **Create Automation** in XSOAR with `Summarize_Incident_LLM.py`.  
+2. **Add to Playbook** step “Summarize with LLM” after evidence collection.  
+3. **Pass evidence** as a single text blob (alerts/logs/headers).  
+4. **Post result** to War Room + Slack notification.  
+5. **Measure KPI:** average time saved per ticket (expect 10–15 min).
+
+_____________________________________________________________________________________________________________________________________________
+
+## 🔐 Security Notes
+- Keep API keys in **XSOAR Credentials** (don’t hardcode).  
+- Add domain/IP allowlists to prevent sending regulated data.  
+- Keep **temperature=0.2** for consistent, factual output.  
+- Enforce **human-in-the-loop** before case closure.
