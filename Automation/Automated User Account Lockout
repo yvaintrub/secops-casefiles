@@ -1,7 +1,16 @@
-Automated User Account Lockout (Suspicious Login)
+# 👤 Automated User Account Lockout (Suspicious Login)
 
-### Flow (ASCII Diagram)
+## 📌 Executive Summary
+When a suspicious login is detected (impossible travel, anomalous geo, or repeated MFA failures), analysts often lose time validating before taking action.  
+XSOAR can **automatically disable accounts** in AD/Azure AD if risk signals are strong enough.  
 
+**🎯 Outcome:** stops attacker misuse of compromised accounts in under 2 minutes — without waiting for manual SOC approval.
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🖼 Flow (ASCII Diagram)
+
+```
 +-------------------------+
 | SIEM Alert: Suspicious  |
 | Login (geo impossible)  |
@@ -28,5 +37,132 @@ Automated User Account Lockout (Suspicious Login)
 +-------------------------+
 | Notify SOC + User       |
 +-------------------------+
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## ⚙️ Playbook Logic
+
+1. **Trigger:** SIEM alert with login anomaly (impossible travel, geo-velocity, multiple failures).  
+2. **Enrichment:** GeoIP lookup + TI feeds to validate source IP.  
+3. **Validation:** Check recent login history, MFA results.  
+4. **Action:** If confidence ≥ threshold → auto-disable user in **AD/Azure AD**.  
+5. **Notification:** SOC alerted in Slack/Teams; user emailed/SMS with recovery steps.  
+
+____________________________________________________________________________________________________________________________________________________
+
+## 💾 Example Automation Script (Python3) — `Account_Lockout.py`
+
+```python
+def main():
+    username = demisto.args().get("username")
+    risk_score = int(demisto.args().get("risk_score", 0))
+
+    if risk_score >= 80:
+        # Disable user in Azure AD
+        disable = demisto.executeCommand("azure-ad-disable-user", {"user": username})
+        demisto.results(f"🔒 User {username} disabled due to high-risk login.")
+    else:
+        demisto.results(f"⚠️ Risk score too low to auto-disable: {risk_score}")
+
+try:
+    main()
+except Exception as e:
+    return_error(f"Account_Lockout failed: {e}")
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🧩 Mini-Playbook (YAML)
+
+```yaml
+name: Automated User Lockout
+description: Disable user accounts automatically on suspicious logins.
+fromversion: "6.0.0"
+tasks:
+  "0":
+    id: "0"
+    type: start
+    task:
+      name: Start
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    type: regular
+    task:
+      name: Enrich Login
+      script: IPEnrichment
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    type: condition
+    task:
+      name: Risk Threshold
+    conditions:
+      "High Risk":
+        - - greaterThan
+          - ${RiskScore}
+          - "80"
+    nexttasks:
+      "High Risk": ["3"]
+  "3":
+    id: "3"
+    type: regular
+    task:
+      name: Disable User
+      script: azure-ad-disable-user
+      scriptarguments:
+        user: ${incident.username}
+    nexttasks:
+      '#none#': ["4"]
+  "4":
+    id: "4"
+    type: regular
+    task:
+      name: Notify SOC
+      script: SendNotification
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🔔 Example Slack/Teams Notification
+
+```json
+{
+  "channel": "#soc-alerts",
+  "text": "🚨 User Account Auto-Locked",
+  "attachments": [
+    {
+      "color": "#FF0000",
+      "title": "Suspicious Login Detected",
+      "fields": [
+        { "title": "User", "value": "jdoe@corp.com", "short": true },
+        { "title": "Risk Score", "value": "92", "short": true },
+        { "title": "Action", "value": "Account Disabled", "short": false }
+      ]
+    }
+  ]
+}
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 👀 Detection Use Cases
+- Impossible travel (New York → Moscow in <1h).  
+- Multiple MFA failures followed by success.  
+- IP flagged as **credential stuffing botnet** in TI feeds.  
+- Abnormal login times (e.g., 3 AM for HR account).  
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🛡️ Recommendations
+- Automate **temporary lockouts** with SOC override for critical accounts.  
+- Maintain whitelist for break-glass/emergency accounts.  
+- Integrate **Okta / Azure AD sign-in logs** with SIEM.  
+- Provide clear **user recovery workflows** to avoid business disruption.  
+
+____________________________________________________________________________________________________________________________________________________
 
 **Benefit:** prevents account misuse within 1–2 minutes of detection, instead of waiting for manual SOC approval.
