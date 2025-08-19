@@ -1,13 +1,15 @@
-# 🛡 Unauthorized Lateral Movement via PSExec
+🛡 Unauthorized Lateral Movement via PSExec (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-EDR detected suspicious use of PSExec from a finance workstation targeting a file server. Investigation confirmed stolen domain credentials were used to attempt lateral movement. The attempt was contained before any persistence or exfiltration occurred.
+EDR detected suspicious use of PSExec originating from a finance department workstation targeting a file server.
+Stolen domain admin credentials were leveraged in the attempt.
+The intrusion was blocked before persistence, malware deployment, or exfiltration occurred.
 
-**🎯 Outcome:** lateral movement blocked, credentials reset, no data loss.
+🎯 Outcome: lateral movement blocked, credentials reset, no data loss.
 
----
+_______________________________________________________________________________________________________________________________________________
 
-## 🖼 Attack Flow (ASCII Diagram)
+🖼 Attack Flow (ASCII Diagram)
 
 +---------------------------+
 | Compromised Workstation   |
@@ -28,7 +30,7 @@ EDR detected suspicious use of PSExec from a finance workstation targeting a fil
              |
              v
 +---------------------------+
-| EDR Alert → SOC Response  |
+| 🚨 EDR Alert → SOC IR     |
 +---------------------------+
              |
              v
@@ -37,39 +39,147 @@ EDR detected suspicious use of PSExec from a finance workstation targeting a fil
 | Lateral Move Stopped      |
 +---------------------------+
 
----
+_______________________________________________________________________________________________________________________________________________
 
-## ⏱ Timeline (UTC)
-- 18:04 – EDR logs suspicious PSExec execution.  
-- 18:08 – SOC validates command line args w/ domain admin creds.  
-- 18:15 – Workstation isolated; creds reset.  
-- 18:40 – No persistence or malware observed on server.  
-- 19:00 – IOC sweep performed, case closed.  
+📖 Attack Narrative
 
----
+🥷 Stage 1 – Initial Execution
 
-## 🔑 Key Findings
-- PSExec executed with stolen admin credentials.  
-- Attempted pivot to sensitive file server.  
-- Activity detected within minutes.  
+Finance workstation compromised (likely via phishing/malware).
 
----
+PSExec binary launched with stolen domain admin creds.
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1021.002 – SMB/Windows Admin Shares**  
-- **T1569.002 – Remote Service Execution (PSExec)**  
-- **T1078 – Valid Accounts**  
 
----
+🌐 Stage 2 – Lateral Movement Attempt
 
-## 👀 Detection Use Cases
-- Alert on PSExec usage from non-admin hosts.  
-- Monitor use of domain admin creds outside normal scope.  
-- Correlate SMB admin share usage with unusual accounts.  
+Targeted file server via admin$ SMB share.
 
----
+Command-line args matched remote service execution pattern.
 
-## 🛡️ Recommendations
-- Restrict PSExec usage to IT admins only.  
-- Enforce just-in-time access for privileged accounts.  
-- Monitor authentication patterns for anomalies.  
+
+🛡 Stage 3 – Containment
+
+EDR flagged PSExec use from non-IT host.
+
+SOC validated suspicious creds usage.
+
+Workstation isolated, creds disabled.
+
+No persistence or malicious files on server.
+
+_______________________________________________________________________________________________________________________________________________
+
+⏱ Timeline (UTC)
+
+| Time  | Event                                                         |
+| ----- | ------------------------------------------------------------- |
+| 18:04 | 🚨 EDR logs suspicious PSExec execution                       |
+| 18:08 | 🟡 SOC confirms stolen domain creds used in command line args |
+| 18:15 | 🛑 Workstation isolated, domain account reset                 |
+| 18:40 | 🔍 IOC sweep → no persistence/malware on file server          |
+| 19:00 | ✅ Incident closed after containment & credential rotation     |
+
+_______________________________________________________________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+EDR Process Log:
+
+{
+  "time": "2025-06-22T18:04:11Z",
+  "host": "FIN-WKS23",
+  "process": "psexec.exe",
+  "commandLine": "psexec.exe \\\\FILE-SRV01 -u DOMAIN\\admin -p ******** cmd.exe /c whoami",
+  "user": "DOMAIN\\admin",
+  "target": "FILE-SRV01",
+  "action": "alert"
+}
+
+Windows Security Log (File Server):
+
+{
+  "time": "2025-06-22T18:05:02Z",
+  "eventID": 4624,
+  "logonType": 3,
+  "account": "DOMAIN\\admin",
+  "srcHost": "FIN-WKS23",
+  "targetHost": "FILE-SRV01"
+}
+
+_______________________________________________________________________________________________________________________________________________
+
+💻 Attacker Commands (Reconstructed, Synthetic)
+
+# Example lateral move attempt
+psexec.exe \\FILE-SRV01 -u DOMAIN\admin -p <stolen_pass> cmd.exe /c whoami
+
+# Potential follow-on usage
+psexec.exe \\FILE-SRV01 -u DOMAIN\admin -p <stolen_pass> cmd.exe /c net user attacker P@ss123 /add
+psexec.exe \\FILE-SRV01 -u DOMAIN\admin -p <stolen_pass> cmd.exe /c net localgroup administrators attacker /add
+
+_______________________________________________________________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+| Type    | Value                     | Source        | Status      |
+| ------- | ------------------------- | ------------- | ----------- |
+| Host    | FIN-WKS23                 | EDR / Sysmon  | Compromised |
+| Host    | FILE-SRV01                | Security Logs | Targeted    |
+| Tool    | psexec.exe (Sysinternals) | EDR logs      | Abused      |
+| Account | DOMAIN\admin              | EDR + WinLogs | Abused      |
+
+_______________________________________________________________________________________________________________________________________________
+
+🔑 Key Findings
+
+🚨 PSExec launched from non-IT workstation.
+
+🚨 Stolen domain creds confirmed.
+
+🛑 No malware dropped / no persistence.
+
+🛡️ Fast SOC response → prevented escalation.
+
+_______________________________________________________________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+T1021.002 – SMB/Windows Admin Shares
+
+T1569.002 – Remote Service Execution (PSExec)
+
+T1078 – Valid Accounts
+
+_______________________________________________________________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+🚨 Alert on psexec.exe execution from non-admin hosts.
+
+🚨 Correlate domain admin logins with workstation events.
+
+🛠 Detect anomalous logon patterns (finance dept → servers).
+
+_______________________________________________________________________________________________________________________________________________
+
+🛡️ Response Actions
+
+❌ Workstation FIN-WKS23 isolated from domain.
+
+🔒 Domain admin account reset + creds rotated.
+
+🔍 IOC sweep → confirmed no persistence.
+
+📑 SOC added rule to block PSExec except for IT hosts.
+
+_______________________________________________________________________________________________________________________________________________
+
+🛡️ Recommendations
+
+Restrict PSExec to IT-admin controlled hosts.
+
+Enforce just-in-time (JIT) access for privileged accounts.
+
+Enable Sysmon logging for remote execution tools.
+
+Train analysts to treat PSExec + unusual host as 🚨 critical.
