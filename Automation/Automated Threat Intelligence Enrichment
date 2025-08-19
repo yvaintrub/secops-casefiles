@@ -1,9 +1,16 @@
-Automated Threat Intelligence Enrichment
+# 🌐 Automated Threat Intelligence Enrichment (XSOAR Playbook)
 
-Before escalation, incidents should be enriched with context (hash, domain, IP). XSOAR can query multiple TI sources (VirusTotal, MISP, Palo Alto Autofocus, Recorded Future).
+## 📌 Executive Summary
+Analysts often waste time manually copy-pasting IOCs into different threat intel platforms (VT, MISP, RF, Autofocus).  
+With XSOAR, enrichment is **fully automated**: every IOC is checked across multiple sources, confidence-scored, and added back to the incident record.  
 
-### Flow (ASCII Diagram)
+**🎯 Outcome:** no more manual TI lookups, faster triage, consistent enrichment for every case.
 
+____________________________________________________________________________________________________________________________________________________
+
+## 🖼 Flow (ASCII Diagram)
+
+```
 +-------------------------+
 | IOC Detected (alert)    |
 +-------------------------+
@@ -33,5 +40,137 @@ Before escalation, incidents should be enriched with context (hash, domain, IP).
 | Update Incident         |
 | (add TI context)        |
 +-------------------------+
+```
 
-**Benefit:** eliminates manual copy/paste lookups, ensures consistent enrichment.
+____________________________________________________________________________________________________________________________________________________
+
+## 📂 IOC Example
+
+```
+IOC: 185.199.108.153
+- VirusTotal → Clean
+- MISP → Seen in Emotet campaign
+- Recorded Future → Risk Score: 82/100 (High)
+Aggregate Verdict → Malicious (High Confidence)
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 💾 Automation Script (Python3) — `TI_Aggregator.py`
+
+```python
+def main():
+    ioc = demisto.args().get("value")
+    scores = []
+
+    vt = demisto.executeCommand("vt-ip-report", {"ip": ioc})
+    misp = demisto.executeCommand("misp-search-indicator", {"value": ioc})
+    rf = demisto.executeCommand("recordedfuture-ip", {"ip": ioc})
+
+    if "malicious" in str(vt).lower():
+        scores.append(80)
+    if "Emotet" in str(misp):
+        scores.append(70)
+    if "risk" in str(rf).lower():
+        scores.append(85)
+
+    final_score = max(scores) if scores else 0
+    verdict = "Malicious" if final_score >= 70 else "Suspicious" if final_score > 40 else "Benign"
+
+    md = f"### TI Enrichment\n- IOC: {ioc}\n- Score: {final_score}\n- Verdict: **{verdict}**"
+    return_results(md)
+
+try:
+    main()
+except Exception as e:
+    return_error(f"TI_Aggregator failed: {e}")
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🧩 Mini-Playbook (YAML) — `Playbook-TI-Enrichment.yml`
+
+```yaml
+name: Automated Threat Intel Enrichment
+description: Enrich IOCs with VirusTotal, MISP, Recorded Future, and aggregate results.
+fromversion: "6.0.0"
+tasks:
+  "0":
+    id: "0"
+    type: start
+    task:
+      name: Start
+    nexttasks:
+      '#none#': ["1"]
+  "1":
+    id: "1"
+    type: regular
+    task:
+      name: Extract IOCs
+      script: ExtractIndicatorsFromText
+      scriptarguments:
+        text: { simple: ${incident.rawJSON} }
+    nexttasks:
+      '#none#': ["2"]
+  "2":
+    id: "2"
+    type: regular
+    task:
+      name: Enrich IOCs
+      scriptName: TI_Aggregator
+      scriptarguments:
+        value: { simple: ${ExtractIndicatorsFromText.Indicator} }
+    nexttasks:
+      '#none#': ["3"]
+  "3":
+    id: "3"
+    type: regular
+    task:
+      name: Update Incident
+      script: SetIncident
+      scriptarguments:
+        customFields: { simple: "TI Verdict: ${TI_Aggregator.Verdict}" }
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🔔 Slack / Teams Notification Example
+
+```json
+{
+  "channel": "#soc-tintel",
+  "text": "🌐 IOC Enriched",
+  "attachments": [
+    {
+      "color": "#FFA500",
+      "title": "TI Verdict",
+      "fields": [
+        { "title": "IOC", "value": "185.199.108.153", "short": true },
+        { "title": "Verdict", "value": "Malicious", "short": true },
+        { "title": "Score", "value": "82", "short": true }
+      ]
+    }
+  ]
+}
+```
+
+____________________________________________________________________________________________________________________________________________________
+
+## ✅ How It Works
+1. IOC detected in SIEM/EDR alert.  
+2. Automation triggers IOC extraction.  
+3. IOC enriched across **VirusTotal, MISP, Recorded Future, Autofocus**.  
+4. Scores aggregated → final verdict assigned.  
+5. Result added to incident + pushed to SIEM + SOC notified.  
+
+____________________________________________________________________________________________________________________________________________________
+
+## 🛡️ Recommendations
+- Integrate multiple TI feeds for redundancy.  
+- Normalize scoring across platforms (0–100 scale).  
+- Push enriched IOCs into SIEM/EDR for correlation.  
+- Store verdicts for future hunt queries.  
+
+____________________________________________________________________________________________________________________________________________________
+
+**Benefit:** eliminates manual IOC lookups, ensures consistent enrichment across SOC workflows.
